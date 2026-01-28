@@ -16,16 +16,6 @@ interface WindowFrameProps {
   children: React.ReactNode;
 }
 
-// Détection mobile locale pour ce composant
-const isMobileDevice = () => {
-  try {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
-  } catch (e) {
-    return false;
-  }
-};
-
 export const WindowFrame: React.FC<WindowFrameProps> = ({
   window: win,
   barPosition,
@@ -39,7 +29,6 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
   widgetTransparent,
   children
 }) => {
-  const [isMobile] = useState(isMobileDevice());
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
@@ -86,18 +75,19 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
   const effectiveBarSize = barSize > 0 ? barSize : defaultBarSize;
   const maxInsets = win.isMaximized
     ? {
-      top: barPosition === 'top' ? effectiveBarSize : 0,
-      right: barPosition === 'right' ? effectiveBarSize : 0,
-      bottom: barPosition === 'bottom' ? effectiveBarSize : 0,
-      left: barPosition === 'left' ? effectiveBarSize : 0
-    }
+        top: barPosition === 'top' ? effectiveBarSize : 0,
+        right: barPosition === 'right' ? effectiveBarSize : 0,
+        bottom: barPosition === 'bottom' ? effectiveBarSize : 0,
+        left: barPosition === 'left' ? effectiveBarSize : 0
+      }
     : null;
 
   return (
     <div
       data-window="true"
-      className={`absolute flex flex-col overflow-hidden rounded-lg shadow-2xl border border-white/20 ${isMobile ? '' : 'backdrop-blur-xl'
-        } transition-all duration-200 ${isMobile ? '' : 'gpu-layer'} ${win.isMaximized ? 'rounded-none' : ''}`}
+      className={`absolute flex flex-col overflow-hidden rounded-lg shadow-2xl border border-white/20 backdrop-blur-xl transition-all duration-200 gpu-layer ${
+        win.isMaximized ? 'rounded-none' : ''
+      }`}
       style={{
         left: win.isMaximized ? maxInsets?.left : win.x,
         top: win.isMaximized ? maxInsets?.top : win.y,
@@ -139,7 +129,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
               onMinimize(win.id);
             }}
             className="w-4 h-4 rounded-full bg-yellow-500 hover:bg-yellow-600 border border-white/30 shadow flex items-center justify-center"
-            aria-label="Réduire"
+            aria-label="Reduire"
           >
             <Minus size={10} className="text-white" />
           </button>
@@ -163,9 +153,9 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
         style={
           win.kind === 'widget'
             ? {
-              backgroundColor: widgetTransparent ? 'transparent' : barColor || 'rgba(15, 23, 42, 0.85)',
-              color: '#fff'
-            }
+                backgroundColor: widgetTransparent ? 'transparent' : barColor || 'rgba(15, 23, 42, 0.85)',
+                color: '#fff'
+              }
             : undefined
         }
       >
@@ -186,3 +176,4 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
     </div>
   );
 };
+

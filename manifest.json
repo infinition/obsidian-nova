@@ -1,11 +1,10 @@
 {
-  "id": "obsidian-nova",
-  "name": "OBSIDIAN-NOVA",
+  "id": "obsidian-webos",
+  "name": "Obsidian WebOS",
   "version": "0.1.0",
-  "minAppVersion": "1.0.0",
-  "author": "Infinition",
-  "description": "OBSIDIAN-NOVA is a webOS plugin for Obsidian.",
-  "main": "main.js",
-  "scripts": {},
-  "css": "styles.css"
+  "minAppVersion": "1.5.0",
+  "description": "Desktop-like WebOS interface inside an Obsidian view.",
+  "author": "infinition",
+  "authorUrl": "https://github.com/infinition",
+  "isDesktopOnly": false
 }

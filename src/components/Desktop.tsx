@@ -8,8 +8,6 @@ import type {
   WebOSWidgetTemplate,
   WebOSWindow
 } from '../types';
-// IMPORT DU NOUVEAU HOOK (assurez-vous du chemin relatif)
-import { useResponsive } from '../hooks/useResponsive';
 import { Dock } from './Dock';
 import { FinderView } from './FinderView';
 import { Taskbar } from './Taskbar';
@@ -671,9 +669,6 @@ interface ResizeHandle {
 }
 
 export const Desktop: React.FC<DesktopProps> = ({ api }) => {
-  // UTILISATION DU NOUVEAU HOOK
-  const { isMobile, width: windowWidth, height: windowHeight } = useResponsive();
-
   const [items, setItems] = useState<WebOSItem[]>([]);
   const [config, setConfig] = useState<WebOSConfig>(DEFAULT_CONFIG);
   const [windows, setWindows] = useState<WebOSWindow[]>([]);
@@ -737,23 +732,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
 
-  // Nombre de colonnes fixe pour garantir un layout identique
-  // sur toutes les plateformes (desktop, iPad, mobile).
-  // Sinon, un layout sauvegardé sur 16 colonnes peut se retrouver
-  // « cassé » sur un appareil qui n’en utilise plus que 8 ou 12.
-  const FIXED_GRID_COLS = 16;
-
   const [gridRowHeight, setGridRowHeight] = useState(96);
-  const [gridCols, setGridCols] = useState(FIXED_GRID_COLS);
-
-  // DEBUGGING LOGS (Step 6)
-  useEffect(() => {
-    console.log('=== WebOS Debug ===');
-    console.log('Is Mobile:', isMobile);
-    console.log('Window:', windowWidth, 'x', windowHeight);
-    console.log('Grid cols:', gridCols);
-    console.log('Cell width:', gridRowHeight);
-  }, [isMobile, gridCols, gridRowHeight, windowWidth, windowHeight]);
+  const [gridCols, setGridCols] = useState(8);
 
   const currentTheme = THEMES[config.theme] ?? THEMES.dark;
   const isRemotePath = useCallback((value: string) => /^(https?:|data:|app:|file:)/i.test(value), []);
@@ -1103,15 +1083,15 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const updateGridMetrics = useCallback(() => {
     const container = gridRef.current;
     if (!container) return;
-
     const rect = container.getBoundingClientRect();
-    const cols = FIXED_GRID_COLS;
+    let cols = 8;
+    if (rect.width >= 768) cols = 12;
+    if (rect.width >= 1024) cols = 16;
     setGridCols(cols);
-
     const gap = 16;
     const colWidth = (rect.width - gap * (cols - 1)) / cols;
     setGridRowHeight(colWidth);
-  }, [FIXED_GRID_COLS]);
+  }, []);
 
   useEffect(() => {
     updateGridMetrics();
@@ -1162,8 +1142,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     const hasActiveWindow = windows.some((win) => !win.isMinimized);
     const fullscreenActive = fullscreenWidgetId
       ? windows.some(
-        (win) => win.kind === 'widget' && win.widgetItemId === fullscreenWidgetId && !win.isMinimized
-      )
+          (win) => win.kind === 'widget' && win.widgetItemId === fullscreenWidgetId && !win.isMinimized
+        )
       : false;
     return hasActiveWindow || fullscreenActive;
   }, [windows, fullscreenWidgetId]);
@@ -1694,13 +1674,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       const nextPreview =
         overlapTarget && draggedX && draggedY
           ? {
-            targetId: overlapTarget.id,
-            targetPos: {
-              x: overlapTarget.x ?? layoutOverrides.get(overlapTarget.id)?.x ?? 0,
-              y: overlapTarget.y ?? layoutOverrides.get(overlapTarget.id)?.y ?? 0
-            },
-            draggedPos: { x: draggedX, y: draggedY }
-          }
+              targetId: overlapTarget.id,
+              targetPos: {
+                x: overlapTarget.x ?? layoutOverrides.get(overlapTarget.id)?.x ?? 0,
+                y: overlapTarget.y ?? layoutOverrides.get(overlapTarget.id)?.y ?? 0
+              },
+              draggedPos: { x: draggedX, y: draggedY }
+            }
           : null;
 
       setSwapPreview((prev) => {
@@ -2087,17 +2067,17 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     const dragOffset = pageDragOffsetRef.current;
     if (isPageDragging) {
       let snapped = false;
-      if (Math.abs(dragOffset.x) >= 30 && Math.abs(dragOffset.x) >= Math.abs(dragOffset.y)) {
-        const dirX = dragOffset.x < 0 ? 1 : -1;
-        snapped = movePageBy(dirX, 0);
-        schedulePageSnap({ x: dragOffset.x + dirX * 100, y: dragOffset.y });
-      } else if (Math.abs(dragOffset.y) >= 30 && Math.abs(dragOffset.y) >= Math.abs(dragOffset.x)) {
-        if (!config.lockVerticalSwipe) {
-          const dirY = dragOffset.y < 0 ? 1 : -1;
-          snapped = movePageBy(0, dirY);
-          schedulePageSnap({ x: dragOffset.x, y: dragOffset.y + dirY * 100 });
+        if (Math.abs(dragOffset.x) >= 30 && Math.abs(dragOffset.x) >= Math.abs(dragOffset.y)) {
+          const dirX = dragOffset.x < 0 ? 1 : -1;
+          snapped = movePageBy(dirX, 0);
+          schedulePageSnap({ x: dragOffset.x + dirX * 100, y: dragOffset.y });
+        } else if (Math.abs(dragOffset.y) >= 30 && Math.abs(dragOffset.y) >= Math.abs(dragOffset.x)) {
+          if (!config.lockVerticalSwipe) {
+            const dirY = dragOffset.y < 0 ? 1 : -1;
+            snapped = movePageBy(0, dirY);
+            schedulePageSnap({ x: dragOffset.x, y: dragOffset.y + dirY * 100 });
+          }
         }
-      }
       if (!snapped) {
         schedulePageSnap({ x: dragOffset.x, y: dragOffset.y });
       }
@@ -2357,9 +2337,9 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             style={
               item.bgColor !== 'glass'
                 ? {
-                  backgroundColor: item.fullSize ? 'transparent' : item.bgColor,
-                  border: undefined
-                }
+                    backgroundColor: item.fullSize ? 'transparent' : item.bgColor,
+                    border: undefined
+                  }
                 : {}
             }
           >
@@ -2444,7 +2424,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold">Paramètres</h3>
+            <h3 className="text-xl font-bold">Parametres</h3>
             <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-white/10 rounded-full">
               <X size={18} />
             </button>
@@ -2453,17 +2433,19 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => setSettingsTab('display')}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${settingsTab === 'display' ? 'bg-blue-600 border-blue-500' : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
+                settingsTab === 'display' ? 'bg-blue-600 border-blue-500' : 'bg-white/5 border-white/10 hover:bg-white/10'
+              }`}
             >
               Affichage
             </button>
             <button
               onClick={() => setSettingsTab('navigation')}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${settingsTab === 'navigation'
-                ? 'bg-blue-600 border-blue-500'
-                : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
+                settingsTab === 'navigation'
+                  ? 'bg-blue-600 border-blue-500'
+                  : 'bg-white/5 border-white/10 hover:bg-white/10'
+              }`}
             >
               Navigation
             </button>
@@ -2472,7 +2454,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           {settingsTab === 'navigation' && (
             <div className="space-y-6">
               <div>
-                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Sensibilité du swipe</label>
+                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Sensibilite du swipe</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
@@ -2497,10 +2479,11 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     lockVerticalSwipe: !prev.lockVerticalSwipe
                   }))
                 }
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${config.lockVerticalSwipe
-                  ? 'bg-blue-600/30 border-blue-500'
-                  : 'bg-slate-800 border-white/10 hover:bg-white/5'
-                  }`}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${
+                  config.lockVerticalSwipe
+                    ? 'bg-blue-600/30 border-blue-500'
+                    : 'bg-slate-800 border-white/10 hover:bg-white/5'
+                }`}
               >
                 <span className="text-sm font-medium">Verrouiller swipe vertical</span>
                 <span className="text-xs font-bold">{config.lockVerticalSwipe ? 'ON' : 'OFF'}</span>
@@ -2510,178 +2493,187 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
 
           {settingsTab === 'display' && (
             <>
-              <div className="mb-6">
-                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Mode d'affichage</label>
-                <div className="flex bg-slate-800 p-1 rounded-lg">
-                  <button
-                    onClick={() => setConfig((prev) => ({ ...prev, viewMode: 'grid' }))}
-                    className={`flex-1 py-2 rounded-md text-sm font-bold transition ${config.viewMode === 'grid' ? 'bg-blue-600 shadow-lg' : 'hover:bg-white/5'
-                      }`}
-                  >
-                    Grille
-                  </button>
-                  <button
-                    onClick={() => setConfig((prev) => ({ ...prev, viewMode: 'desktop' }))}
-                    className={`flex-1 py-2 rounded-md text-sm font-bold transition ${config.viewMode === 'desktop' ? 'bg-blue-600 shadow-lg' : 'hover:bg-white/5'
-                      }`}
-                  >
-                    Bureau
-                  </button>
-                </div>
-              </div>
+          <div className="mb-6">
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Mode d'affichage</label>
+            <div className="flex bg-slate-800 p-1 rounded-lg">
+              <button
+                onClick={() => setConfig((prev) => ({ ...prev, viewMode: 'grid' }))}
+                className={`flex-1 py-2 rounded-md text-sm font-bold transition ${
+                  config.viewMode === 'grid' ? 'bg-blue-600 shadow-lg' : 'hover:bg-white/5'
+                }`}
+              >
+                Grille
+              </button>
+              <button
+                onClick={() => setConfig((prev) => ({ ...prev, viewMode: 'desktop' }))}
+                className={`flex-1 py-2 rounded-md text-sm font-bold transition ${
+                  config.viewMode === 'desktop' ? 'bg-blue-600 shadow-lg' : 'hover:bg-white/5'
+                }`}
+              >
+                Bureau
+              </button>
+            </div>
+          </div>
 
-              <div className="mb-6">
-                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Position de la barre</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['top', 'bottom', 'left', 'right'] as const).map((pos) => (
-                    <button
-                      key={pos}
-                      onClick={() => setConfig((prev) => ({ ...prev, barPosition: pos }))}
-                      className={`py-2 rounded-lg border capitalize text-sm ${config.barPosition === pos ? 'bg-blue-600 border-blue-500' : 'border-white/10 hover:bg-white/5'
-                        }`}
-                    >
-                      {pos}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Thème</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(THEMES).map(([key, theme]) => (
-                    <button
-                      key={key}
-                      onClick={() => setConfig((prev) => ({ ...prev, theme: key as WebOSConfig['theme'] }))}
-                      className={`flex items-center gap-3 p-3 rounded-xl border transition text-left ${config.theme === key ? 'border-blue-500 bg-white/5' : 'border-white/10 hover:bg-white/5'
-                        }`}
-                    >
-                      <div className={`w-8 h-8 rounded-full shadow-lg ${theme.bar} border border-white/20 relative`} />
-                      <span className="font-medium">{theme.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Widgets Obsidg(et)</label>
+          <div className="mb-6">
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Position de la barre</label>
+            <div className="grid grid-cols-4 gap-2">
+              {(['top', 'bottom', 'left', 'right'] as const).map((pos) => (
                 <button
-                  onClick={() =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      transparentObsidgetWidgets: !prev.transparentObsidgetWidgets
-                    }))
-                  }
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${config.transparentObsidgetWidgets
-                    ? 'bg-blue-600/30 border-blue-500'
-                    : 'bg-slate-800 border-white/10 hover:bg-white/5'
-                    }`}
+                  key={pos}
+                  onClick={() => setConfig((prev) => ({ ...prev, barPosition: pos }))}
+                  className={`py-2 rounded-lg border capitalize text-sm ${
+                    config.barPosition === pos ? 'bg-blue-600 border-blue-500' : 'border-white/10 hover:bg-white/5'
+                  }`}
                 >
-                  <span className="text-sm font-medium">Fond transparent (par défaut)</span>
-                  <span className="text-xs font-bold">{config.transparentObsidgetWidgets ? 'ON' : 'OFF'}</span>
+                  {pos}
                 </button>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              <div className="mb-6">
-                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Widget plein écran</label>
+          <div className="mb-6">
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Theme</label>
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(THEMES).map(([key, theme]) => (
                 <button
-                  onClick={() =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      fullscreenWidgetTransparent: !prev.fullscreenWidgetTransparent
-                    }))
-                  }
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${config.fullscreenWidgetTransparent
-                    ? 'bg-blue-600/30 border-blue-500'
-                    : 'bg-slate-800 border-white/10 hover:bg-white/5'
-                    }`}
+                  key={key}
+                  onClick={() => setConfig((prev) => ({ ...prev, theme: key as WebOSConfig['theme'] }))}
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition text-left ${
+                    config.theme === key ? 'border-blue-500 bg-white/5' : 'border-white/10 hover:bg-white/5'
+                  }`}
                 >
-                  <span className="text-sm font-medium">Fond transparent (plein écran)</span>
-                  <span className="text-xs font-bold">{config.fullscreenWidgetTransparent ? 'ON' : 'OFF'}</span>
+                  <div className={`w-8 h-8 rounded-full shadow-lg ${theme.bar} border border-white/20 relative`} />
+                  <span className="font-medium">{theme.name}</span>
                 </button>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              <div className="mb-6">
-                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Fond d'écran</label>
-                <div className="grid grid-cols-3 gap-2 mb-2">
-                  {WALLPAPERS.map((url) => (
-                    <button
-                      key={url}
-                      onClick={() => setConfig((prev) => ({ ...prev, wallpaper: url }))}
-                      className={`aspect-video rounded-lg bg-cover bg-center border-2 transition ${config.wallpaper === url ? 'border-blue-500 scale-105' : 'border-transparent hover:border-white/50'
-                        }`}
-                      style={{ backgroundImage: `url(${url})` }}
+          <div className="mb-6">
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Widgets Obsidg(et)</label>
+            <button
+              onClick={() =>
+                setConfig((prev) => ({
+                  ...prev,
+                  transparentObsidgetWidgets: !prev.transparentObsidgetWidgets
+                }))
+              }
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${
+                config.transparentObsidgetWidgets
+                  ? 'bg-blue-600/30 border-blue-500'
+                  : 'bg-slate-800 border-white/10 hover:bg-white/5'
+              }`}
+            >
+              <span className="text-sm font-medium">Fond transparent (par défaut)</span>
+              <span className="text-xs font-bold">{config.transparentObsidgetWidgets ? 'ON' : 'OFF'}</span>
+            </button>
+          </div>
+
+          <div className="mb-6">
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Widget plein Ã©cran</label>
+            <button
+              onClick={() =>
+                setConfig((prev) => ({
+                  ...prev,
+                  fullscreenWidgetTransparent: !prev.fullscreenWidgetTransparent
+                }))
+              }
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${
+                config.fullscreenWidgetTransparent
+                  ? 'bg-blue-600/30 border-blue-500'
+                  : 'bg-slate-800 border-white/10 hover:bg-white/5'
+              }`}
+            >
+              <span className="text-sm font-medium">Fond transparent (plein Ã©cran)</span>
+              <span className="text-xs font-bold">{config.fullscreenWidgetTransparent ? 'ON' : 'OFF'}</span>
+            </button>
+          </div>
+
+          <div className="mb-6">
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Fond d'ecran</label>
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              {WALLPAPERS.map((url) => (
+                <button
+                  key={url}
+                  onClick={() => setConfig((prev) => ({ ...prev, wallpaper: url }))}
+                  className={`aspect-video rounded-lg bg-cover bg-center border-2 transition ${
+                    config.wallpaper === url ? 'border-blue-500 scale-105' : 'border-transparent hover:border-white/50'
+                  }`}
+                  style={{ backgroundImage: `url(${url})` }}
+                />
+              ))}
+            </div>
+            <input
+              value={config.wallpaper}
+              onChange={(event) => setConfig((prev) => ({ ...prev, wallpaper: event.target.value }))}
+              className="w-full bg-slate-800 p-3 rounded-xl border border-white/10 text-sm focus:border-blue-500 outline-none"
+              placeholder="Chemin local ou URL..."
+            />
+          </div>
+
+          <div className="mb-6">
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Fond d'ecran video</label>
+            {vaultVideos.length === 0 ? (
+              <div className="text-xs text-slate-500">Aucune video trouvée dans le vault.</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                {vaultVideos.slice(0, 6).map((path) => (
+                  <button
+                    key={path}
+                    onClick={() => setConfig((prev) => ({ ...prev, wallpaper: path }))}
+                    className={`aspect-video rounded-lg overflow-hidden border-2 transition ${
+                      config.wallpaper === path ? 'border-blue-500 scale-105' : 'border-transparent hover:border-white/50'
+                    }`}
+                    title={path}
+                  >
+                    <video
+                      src={api.resolveResourcePath(path)}
+                      className="w-full h-full object-cover"
+                      muted
+                      loop
+                      playsInline
+                      autoPlay
                     />
-                  ))}
-                </div>
-                <input
-                  value={config.wallpaper}
-                  onChange={(event) => setConfig((prev) => ({ ...prev, wallpaper: event.target.value }))}
-                  className="w-full bg-slate-800 p-3 rounded-xl border border-white/10 text-sm focus:border-blue-500 outline-none"
-                  placeholder="Chemin local ou URL..."
-                />
+                  </button>
+                ))}
               </div>
+            )}
+            <input
+              value={config.wallpaper}
+              onChange={(event) => setConfig((prev) => ({ ...prev, wallpaper: event.target.value }))}
+              className="w-full bg-slate-800 p-3 rounded-xl border border-white/10 text-sm focus:border-blue-500 outline-none"
+              placeholder="Chemin local ou URL video..."
+            />
+            <div className="text-[11px] text-slate-500 mt-1">Formats conseillés: mp4, webm, mov.</div>
+          </div>
 
-              <div className="mb-6">
-                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Fond d'écran vidéo</label>
-                {vaultVideos.length === 0 ? (
-                  <div className="text-xs text-slate-500">Aucune vidéo trouvée dans le vault.</div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    {vaultVideos.slice(0, 6).map((path) => (
-                      <button
-                        key={path}
-                        onClick={() => setConfig((prev) => ({ ...prev, wallpaper: path }))}
-                        className={`aspect-video rounded-lg overflow-hidden border-2 transition ${config.wallpaper === path ? 'border-blue-500 scale-105' : 'border-transparent hover:border-white/50'
-                          }`}
-                        title={path}
-                      >
-                        <video
-                          src={api.resolveResourcePath(path)}
-                          className="w-full h-full object-cover"
-                          muted
-                          loop
-                          playsInline
-                          autoPlay
-                        />
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <input
-                  value={config.wallpaper}
-                  onChange={(event) => setConfig((prev) => ({ ...prev, wallpaper: event.target.value }))}
-                  className="w-full bg-slate-800 p-3 rounded-xl border border-white/10 text-sm focus:border-blue-500 outline-none"
-                  placeholder="Chemin local ou URL vidéo..."
-                />
-                <div className="text-[11px] text-slate-500 mt-1">Formats conseillés: mp4, webm, mov.</div>
+          <div className="mb-6">
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Fond du vault</label>
+            {vaultWallpapers.length === 0 ? (
+              <div className="text-xs text-slate-500">Aucune image trouvée dans le vault.</div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {vaultWallpapers.slice(0, 12).map((path) => (
+                  <button
+                    key={path}
+                    onClick={() => setConfig((prev) => ({ ...prev, wallpaper: path }))}
+                    className={`aspect-video rounded-lg bg-cover bg-center border-2 transition ${
+                      config.wallpaper === path ? 'border-blue-500 scale-105' : 'border-transparent hover:border-white/50'
+                    }`}
+                    style={{ backgroundImage: `url(${api.resolveResourcePath(path)})` }}
+                    title={path}
+                  />
+                ))}
               </div>
+            )}
+          </div>
 
-              <div className="mb-6">
-                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Fond du vault</label>
-                {vaultWallpapers.length === 0 ? (
-                  <div className="text-xs text-slate-500">Aucune image trouvée dans le vault.</div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-2">
-                    {vaultWallpapers.slice(0, 12).map((path) => (
-                      <button
-                        key={path}
-                        onClick={() => setConfig((prev) => ({ ...prev, wallpaper: path }))}
-                        className={`aspect-video rounded-lg bg-cover bg-center border-2 transition ${config.wallpaper === path ? 'border-blue-500 scale-105' : 'border-transparent hover:border-white/50'
-                          }`}
-                        style={{ backgroundImage: `url(${api.resolveResourcePath(path)})` }}
-                        title={path}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end">
-                <button onClick={() => setShowSettings(false)} className="bg-white/10 hover:bg-white/20 px-6 py-2 rounded-lg font-bold">
-                  Fermer
-                </button>
-              </div>
+          <div className="flex justify-end">
+            <button onClick={() => setShowSettings(false)} className="bg-white/10 hover:bg-white/20 px-6 py-2 rounded-lg font-bold">
+              Fermer
+            </button>
+          </div>
             </>
           )}
         </div>
@@ -2695,18 +2687,18 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       | { kind: 'template'; template: WebOSWidgetTemplate }
       | { kind: 'item'; item: WebOSWidgetItem }
     > = [
-        ...builtInTemplates.map((template) => ({ kind: 'template' as const, template })),
-        ...osExtraItems.map((item) => ({ kind: 'item' as const, item })),
-        ...obsidgetTemplates.map((template) => ({ kind: 'template' as const, template }))
-      ];
+      ...builtInTemplates.map((template) => ({ kind: 'template' as const, template })),
+      ...osExtraItems.map((item) => ({ kind: 'item' as const, item })),
+      ...obsidgetTemplates.map((template) => ({ kind: 'template' as const, template }))
+    ];
 
     const osEntries: Array<
       | { kind: 'template'; template: WebOSWidgetTemplate }
       | { kind: 'item'; item: WebOSWidgetItem }
     > = [
-        ...builtInTemplates.map((template) => ({ kind: 'template' as const, template })),
-        ...osExtraItems.map((item) => ({ kind: 'item' as const, item }))
-      ];
+      ...builtInTemplates.map((template) => ({ kind: 'template' as const, template })),
+      ...osExtraItems.map((item) => ({ kind: 'item' as const, item }))
+    ];
 
     const galleryEntries =
       widgetGalleryTab === 'os'
@@ -2733,25 +2725,28 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           <div className="flex flex-wrap gap-2 mb-6">
             <button
               onClick={() => setWidgetGalleryTab('all')}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${widgetGalleryTab === 'all' ? 'bg-blue-600 border-blue-500' : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
+                widgetGalleryTab === 'all' ? 'bg-blue-600 border-blue-500' : 'bg-white/5 border-white/10 hover:bg-white/10'
+              }`}
             >
               Tout
             </button>
             <button
               onClick={() => setWidgetGalleryTab('os')}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${widgetGalleryTab === 'os' ? 'bg-blue-600 border-blue-500' : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
+                widgetGalleryTab === 'os' ? 'bg-blue-600 border-blue-500' : 'bg-white/5 border-white/10 hover:bg-white/10'
+              }`}
             >
               OS
             </button>
             {obsidgetTemplates.length > 0 && (
               <button
                 onClick={() => setWidgetGalleryTab('obsidget')}
-                className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${widgetGalleryTab === 'obsidget'
-                  ? 'bg-blue-600 border-blue-500'
-                  : 'bg-white/5 border-white/10 hover:bg-white/10'
-                  }`}
+                className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
+                  widgetGalleryTab === 'obsidget'
+                    ? 'bg-blue-600 border-blue-500'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
               >
                 Obsidget
               </button>
@@ -3005,14 +3000,15 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     if (isPagesEditMode) return;
                     goToPage(pageId);
                   }}
-                  className={`relative rounded-2xl border transition cursor-pointer ${isEmpty
-                    ? isPagesEditMode
-                      ? 'border-dashed border-white/20 bg-white/5'
-                      : 'border-white/5 bg-white/5'
-                    : isActive
-                      ? 'border-blue-500 shadow-lg shadow-blue-500/30 bg-slate-800/80'
-                      : 'border-white/10 bg-slate-800/60 hover:border-white/30'
-                    } ${isFocused ? 'ring-2 ring-white/60' : ''}`}
+                  className={`relative rounded-2xl border transition cursor-pointer ${
+                    isEmpty
+                      ? isPagesEditMode
+                        ? 'border-dashed border-white/20 bg-white/5'
+                        : 'border-white/5 bg-white/5'
+                      : isActive
+                        ? 'border-blue-500 shadow-lg shadow-blue-500/30 bg-slate-800/80'
+                        : 'border-white/10 bg-slate-800/60 hover:border-white/30'
+                  } ${isFocused ? 'ring-2 ring-white/60' : ''}`}
                 >
                   {pageId !== undefined ? (
                     <div className="h-full p-3 flex flex-col">
@@ -3089,8 +3085,9 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             event.stopPropagation();
             setIsPagesEditMode((prev) => !prev);
           }}
-          className={`fixed top-4 right-4 px-3 py-1 rounded-full text-[10px] font-semibold border transition backdrop-blur ${isPagesEditMode ? 'bg-blue-600/70 border-blue-500 text-white' : 'bg-white/10 border-white/10 text-white/80'
-            }`}
+          className={`fixed top-4 right-4 px-3 py-1 rounded-full text-[10px] font-semibold border transition backdrop-blur ${
+            isPagesEditMode ? 'bg-blue-600/70 border-blue-500 text-white' : 'bg-white/10 border-white/10 text-white/80'
+          }`}
         >
           {isPagesEditMode ? 'Terminer' : 'Edit'}
         </button>
@@ -3201,12 +3198,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       <div className="absolute inset-0 bg-black/10" />
 
       <div
-        className={`absolute overflow-hidden ${config.barPosition === 'left'
-          ? 'pl-20 pr-4 py-4'
-          : config.barPosition === 'right'
-            ? 'pr-20 pl-4 py-4'
-            : 'px-4'
-          }`}
+        className={`absolute overflow-hidden ${
+          config.barPosition === 'left'
+            ? 'pl-20 pr-4 py-4'
+            : config.barPosition === 'right'
+              ? 'pr-20 pl-4 py-4'
+              : 'px-4'
+        }`}
         style={{
           top: topInset,
           bottom: bottomInset,
@@ -3227,13 +3225,10 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         <div
           className="absolute inset-0 gpu-layer"
           style={{
-            transform: isMobile
-              ? `translate(${pageTranslate.x}%, ${pageTranslate.y}%)`
-              : `translate3d(${pageTranslate.x}%, ${pageTranslate.y}%, 0)`,
-            transition: isPageDragging && pageSnapOffset.x === 0 && pageSnapOffset.y === 0
-              ? 'none'
-              : isMobile
-                ? 'transform 0.4s ease-out'
+            transform: `translate3d(${pageTranslate.x}%, ${pageTranslate.y}%, 0)`,
+            transition:
+              isPageDragging && pageSnapOffset.x === 0 && pageSnapOffset.y === 0
+                ? 'none'
                 : 'transform 0.65s cubic-bezier(0.22, 1, 0.36, 1)'
           }}
         >
@@ -3290,8 +3285,9 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
 
       {config.viewMode === 'desktop' && dockItems.length > 0 && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 max-w-[95%] w-auto z-40 ${config.barPosition === 'bottom' ? 'bottom-16' : 'bottom-4'
-            }`}
+          className={`absolute left-1/2 -translate-x-1/2 max-w-[95%] w-auto z-40 ${
+            config.barPosition === 'bottom' ? 'bottom-16' : 'bottom-4'
+          }`}
         >
           <Dock items={dockItems} openItemIds={openDockIds} themeClass={currentTheme.dock} onLaunch={launchItem} resolveIcon={resolveIcon} />
         </div>
@@ -3316,8 +3312,9 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       ))}
 
       <div
-        className={`absolute left-0 right-0 flex justify-center pointer-events-none z-30 transition-opacity duration-300 ${showPageDots ? 'opacity-100' : 'opacity-0'
-          }`}
+        className={`absolute left-0 right-0 flex justify-center pointer-events-none z-30 transition-opacity duration-300 ${
+          showPageDots ? 'opacity-100' : 'opacity-0'
+        }`}
         style={config.barPosition === 'bottom' ? { top: topInset } : { bottom: bottomInset }}
       >
         <div
@@ -3341,14 +3338,15 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               return (
                 <div
                   key={`${rowIndex}-${colIndex}`}
-                  className={`rounded-full transition-all ${isCurrent
-                    ? 'bg-white scale-125'
-                    : isMain
-                      ? 'bg-white/70'
-                      : isEmpty
-                        ? 'bg-white/15'
-                        : 'bg-white/35'
-                    }`}
+                  className={`rounded-full transition-all ${
+                    isCurrent
+                      ? 'bg-white scale-125'
+                      : isMain
+                        ? 'bg-white/70'
+                        : isEmpty
+                          ? 'bg-white/15'
+                          : 'bg-white/35'
+                  }`}
                   style={{
                     width: `${dotSize}px`,
                     height: `${dotSize}px`
@@ -3408,3 +3406,5 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     </div>
   );
 };
+
+
