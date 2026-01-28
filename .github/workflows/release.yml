@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "18"
 
-      # 3️⃣ Install deps 
+      # 3️⃣ Install deps
       - run: npm install
 
       # 4️⃣ Build (src → main.js)
