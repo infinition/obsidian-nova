@@ -16,6 +16,16 @@ interface WindowFrameProps {
   children: React.ReactNode;
 }
 
+// Détection mobile locale pour ce composant
+const isMobileDevice = () => {
+  try {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
+  } catch (e) {
+    return false;
+  }
+};
+
 export const WindowFrame: React.FC<WindowFrameProps> = ({
   window: win,
   barPosition,
@@ -29,6 +39,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
   widgetTransparent,
   children
 }) => {
+  const [isMobile] = useState(isMobileDevice());
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
@@ -85,9 +96,9 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
   return (
     <div
       data-window="true"
-      className={`absolute flex flex-col overflow-hidden rounded-lg shadow-2xl border border-white/20 backdrop-blur-xl transition-all duration-200 gpu-layer ${
-        win.isMaximized ? 'rounded-none' : ''
-      }`}
+      className={`absolute flex flex-col overflow-hidden rounded-lg shadow-2xl border border-white/20 ${
+        isMobile ? '' : 'backdrop-blur-xl'
+      } transition-all duration-200 ${isMobile ? '' : 'gpu-layer'} ${win.isMaximized ? 'rounded-none' : ''}`}
       style={{
         left: win.isMaximized ? maxInsets?.left : win.x,
         top: win.isMaximized ? maxInsets?.top : win.y,
@@ -129,7 +140,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
               onMinimize(win.id);
             }}
             className="w-4 h-4 rounded-full bg-yellow-500 hover:bg-yellow-600 border border-white/30 shadow flex items-center justify-center"
-            aria-label="Reduire"
+            aria-label="Réduire"
           >
             <Minus size={10} className="text-white" />
           </button>
@@ -176,4 +187,3 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
     </div>
   );
 };
-

@@ -8,6 +8,8 @@ import type {
   WebOSWidgetTemplate,
   WebOSWindow
 } from '../types';
+// IMPORT DU NOUVEAU HOOK (assurez-vous du chemin relatif)
+import { useResponsive } from '../hooks/useResponsive';
 import { Dock } from './Dock';
 import { FinderView } from './FinderView';
 import { Taskbar } from './Taskbar';
@@ -669,6 +671,9 @@ interface ResizeHandle {
 }
 
 export const Desktop: React.FC<DesktopProps> = ({ api }) => {
+  // UTILISATION DU NOUVEAU HOOK
+  const { isMobile, width: windowWidth, height: windowHeight } = useResponsive();
+  
   const [items, setItems] = useState<WebOSItem[]>([]);
   const [config, setConfig] = useState<WebOSConfig>(DEFAULT_CONFIG);
   const [windows, setWindows] = useState<WebOSWindow[]>([]);
@@ -734,6 +739,15 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
 
   const [gridRowHeight, setGridRowHeight] = useState(96);
   const [gridCols, setGridCols] = useState(8);
+
+  // DEBUGGING LOGS (Step 6)
+  useEffect(() => {
+    console.log('=== WebOS Debug ===');
+    console.log('Is Mobile:', isMobile);
+    console.log('Window:', windowWidth, 'x', windowHeight);
+    console.log('Grid cols:', gridCols);
+    console.log('Cell width:', gridRowHeight);
+  }, [isMobile, gridCols, gridRowHeight, windowWidth, windowHeight]);
 
   const currentTheme = THEMES[config.theme] ?? THEMES.dark;
   const isRemotePath = useCallback((value: string) => /^(https?:|data:|app:|file:)/i.test(value), []);
@@ -2424,7 +2438,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold">Parametres</h3>
+            <h3 className="text-xl font-bold">Paramètres</h3>
             <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-white/10 rounded-full">
               <X size={18} />
             </button>
@@ -2454,7 +2468,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           {settingsTab === 'navigation' && (
             <div className="space-y-6">
               <div>
-                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Sensibilite du swipe</label>
+                <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Sensibilité du swipe</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
@@ -2533,7 +2547,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           </div>
 
           <div className="mb-6">
-            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Theme</label>
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Thème</label>
             <div className="grid grid-cols-2 gap-3">
               {Object.entries(THEMES).map(([key, theme]) => (
                 <button
@@ -2571,7 +2585,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           </div>
 
           <div className="mb-6">
-            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Widget plein Ã©cran</label>
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Widget plein écran</label>
             <button
               onClick={() =>
                 setConfig((prev) => ({
@@ -2585,13 +2599,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                   : 'bg-slate-800 border-white/10 hover:bg-white/5'
               }`}
             >
-              <span className="text-sm font-medium">Fond transparent (plein Ã©cran)</span>
+              <span className="text-sm font-medium">Fond transparent (plein écran)</span>
               <span className="text-xs font-bold">{config.fullscreenWidgetTransparent ? 'ON' : 'OFF'}</span>
             </button>
           </div>
 
           <div className="mb-6">
-            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Fond d'ecran</label>
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Fond d'écran</label>
             <div className="grid grid-cols-3 gap-2 mb-2">
               {WALLPAPERS.map((url) => (
                 <button
@@ -2613,9 +2627,9 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           </div>
 
           <div className="mb-6">
-            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Fond d'ecran video</label>
+            <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Fond d'écran vidéo</label>
             {vaultVideos.length === 0 ? (
-              <div className="text-xs text-slate-500">Aucune video trouvée dans le vault.</div>
+              <div className="text-xs text-slate-500">Aucune vidéo trouvée dans le vault.</div>
             ) : (
               <div className="grid grid-cols-2 gap-2 mb-2">
                 {vaultVideos.slice(0, 6).map((path) => (
@@ -2643,7 +2657,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               value={config.wallpaper}
               onChange={(event) => setConfig((prev) => ({ ...prev, wallpaper: event.target.value }))}
               className="w-full bg-slate-800 p-3 rounded-xl border border-white/10 text-sm focus:border-blue-500 outline-none"
-              placeholder="Chemin local ou URL video..."
+              placeholder="Chemin local ou URL vidéo..."
             />
             <div className="text-[11px] text-slate-500 mt-1">Formats conseillés: mp4, webm, mov.</div>
           </div>
@@ -3225,10 +3239,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         <div
           className="absolute inset-0 gpu-layer"
           style={{
-            transform: `translate3d(${pageTranslate.x}%, ${pageTranslate.y}%, 0)`,
-            transition:
-              isPageDragging && pageSnapOffset.x === 0 && pageSnapOffset.y === 0
-                ? 'none'
+            transform: isMobile
+              ? `translate(${pageTranslate.x}%, ${pageTranslate.y}%)`
+              : `translate3d(${pageTranslate.x}%, ${pageTranslate.y}%, 0)`,
+            transition: isPageDragging && pageSnapOffset.x === 0 && pageSnapOffset.y === 0
+              ? 'none'
+              : isMobile
+                ? 'transform 0.4s ease-out'
                 : 'transform 0.65s cubic-bezier(0.22, 1, 0.36, 1)'
           }}
         >
@@ -3406,5 +3423,3 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     </div>
   );
 };
-
-
