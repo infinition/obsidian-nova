@@ -737,8 +737,14 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
 
+  // Nombre de colonnes fixe pour garantir un layout identique
+  // sur toutes les plateformes (desktop, iPad, mobile).
+  // Sinon, un layout sauvegardé sur 16 colonnes peut se retrouver
+  // « cassé » sur un appareil qui n’en utilise plus que 8 ou 12.
+  const FIXED_GRID_COLS = 16;
+
   const [gridRowHeight, setGridRowHeight] = useState(96);
-  const [gridCols, setGridCols] = useState(8);
+  const [gridCols, setGridCols] = useState(FIXED_GRID_COLS);
 
   // DEBUGGING LOGS (Step 6)
   useEffect(() => {
@@ -1097,24 +1103,15 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const updateGridMetrics = useCallback(() => {
     const container = gridRef.current;
     if (!container) return;
+
     const rect = container.getBoundingClientRect();
-
-    // Safety check for zero width (e.g. on initial load or hidden tab)
-    if (rect.width <= 0) {
-      setGridCols(8);
-      setGridRowHeight(96); // Default sensible value
-      return;
-    }
-
-    let cols = 8;
-    if (rect.width >= 768) cols = 12;
-    if (rect.width >= 1024) cols = 16;
+    const cols = FIXED_GRID_COLS;
     setGridCols(cols);
+
     const gap = 16;
     const colWidth = (rect.width - gap * (cols - 1)) / cols;
-    // Ensure we never have a negative or too small row height
-    setGridRowHeight(Math.max(48, colWidth));
-  }, []);
+    setGridRowHeight(colWidth);
+  }, [FIXED_GRID_COLS]);
 
   useEffect(() => {
     updateGridMetrics();
@@ -3252,7 +3249,6 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                   ref={pageIdx === currentPageId ? gridRef : null}
                   className="grid gap-x-4 gap-y-6 max-w-7xl mx-auto"
                   style={{
-                    display: 'grid', // Force grid display
                     gridAutoRows: `${gridRowHeight}px`,
                     gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`
                   }}
