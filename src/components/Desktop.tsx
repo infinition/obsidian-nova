@@ -2866,21 +2866,6 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       const coord = getPageCoord(pageId);
       usedCoords.add(`${coord.x},${coord.y}`);
     });
-    const findNearestEmptyCoord = (origin: { x: number; y: number }) => {
-      const directions = [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1]
-      ];
-      for (let r = 1; r < 6; r += 1) {
-        for (const [dx, dy] of directions) {
-          const coord = { x: origin.x + dx * r, y: origin.y + dy * r };
-          if (!usedCoords.has(`${coord.x},${coord.y}`)) return coord;
-        }
-      }
-      return { x: origin.x + 1, y: origin.y };
-    };
 
     const cells: Array<{ dx: number; dy: number; pageId?: number; coord: { x: number; y: number } }> = [];
     for (let y = -extentY; y <= extentY; y += 1) {
@@ -2890,6 +2875,55 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         cells.push({ dx: x, dy: y, pageId: entry?.id, coord });
       }
     }
+
+    const canOpenPageAt = (dx: number, dy: number) => {
+      const entry = pageByRel.get(`${dx},${dy}`);
+      if (!entry) return false;
+      const pageId = entry.id;
+      const isHome = pageId === 0;
+      const hasContent = items.some((item) => (item.pageIndex ?? 0) === pageId);
+      const isUsefulHere = isHome || hasContent;
+
+      const neighbourRelCoords: Array<[number, number]> = [
+        [dx + 1, dy],
+        [dx - 1, dy],
+        [dx, dy + 1],
+        [dx, dy - 1]
+      ];
+      const hasNeighbourUseful = neighbourRelCoords.some(([nx, ny]) => {
+        const neighbourEntry = pageByRel.get(`${nx},${ny}`);
+        if (!neighbourEntry) return false;
+        if (neighbourEntry.id === 0) return true;
+        return items.some((item) => (item.pageIndex ?? 0) === neighbourEntry.id);
+      });
+
+      return isUsefulHere || hasNeighbourUseful;
+    };
+
+    // --- CORRECTION: Logique de vérification pour la navigation clavier ---
+    const canFocusAt = (dx: number, dy: number) => {
+      const entry = pageByRel.get(`${dx},${dy}`);
+      
+      const isHome = entry?.id === 0;
+      const itemsInPage = entry ? items.filter((item) => (item.pageIndex ?? 0) === entry.id) : [];
+      const hasContent = itemsInPage.length > 0;
+      const isUsefulHere = isHome || hasContent;
+
+      if (isUsefulHere) return true;
+
+      const neighbourRelCoords: Array<[number, number]> = [
+        [dx + 1, dy], [dx - 1, dy], [dx, dy + 1], [dx, dy - 1]
+      ];
+      
+      const hasNeighbourUseful = neighbourRelCoords.some(([nx, ny]) => {
+        const neighbourEntry = pageByRel.get(`${nx},${ny}`);
+        if (!neighbourEntry) return false;
+        if (neighbourEntry.id === 0) return true;
+        return items.some((item) => (item.pageIndex ?? 0) === neighbourEntry.id);
+      });
+
+      return hasNeighbourUseful;
+    };
 
     useEffect(() => {
       if (!showPages) return;
@@ -2902,10 +2936,25 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       const handleKeyDown = (event: KeyboardEvent) => {
         const target = event.target;
         if (target instanceof Element && target.closest('input, textarea, [contenteditable="true"]')) return;
+        
+        // Fonction interne pour tenter le déplacement
+        const tryMove = (moveX: number, moveY: number) => {
+          const nextDx = atlasFocus.dx + moveX;
+          const nextDy = atlasFocus.dy + moveY;
+          
+          if (nextDx >= -extentX && nextDx <= extentX && 
+              nextDy >= -extentY && nextDy <= extentY && 
+              canFocusAt(nextDx, nextDy)) {
+            setAtlasFocus({ dx: nextDx, dy: nextDy });
+          }
+        };
+
         if (event.key === 'Tab') {
           event.preventDefault();
-          const entry = pageByRel.get(`${atlasFocus.dx},${atlasFocus.dy}`);
-          if (entry) goToPage(entry.id);
+          if (canOpenPageAt(atlasFocus.dx, atlasFocus.dy)) {
+            const entry = pageByRel.get(`${atlasFocus.dx},${atlasFocus.dy}`);
+            if (entry) goToPage(entry.id);
+          }
           return;
         }
         if (event.key === 'Escape') {
@@ -2915,27 +2964,30 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         }
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          const entry = pageByRel.get(`${atlasFocus.dx},${atlasFocus.dy}`);
-          if (entry) goToPage(entry.id);
+          if (canOpenPageAt(atlasFocus.dx, atlasFocus.dy)) {
+            const entry = pageByRel.get(`${atlasFocus.dx},${atlasFocus.dy}`);
+            if (entry) goToPage(entry.id);
+          }
           return;
         }
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
-          setAtlasFocus((prev) => ({ dx: Math.max(-extentX, prev.dx - 1), dy: prev.dy }));
+          tryMove(-1, 0);
         } else if (event.key === 'ArrowRight') {
           event.preventDefault();
-          setAtlasFocus((prev) => ({ dx: Math.min(extentX, prev.dx + 1), dy: prev.dy }));
+          tryMove(1, 0);
         } else if (event.key === 'ArrowUp') {
           event.preventDefault();
-          setAtlasFocus((prev) => ({ dx: prev.dx, dy: Math.max(-extentY, prev.dy - 1) }));
+          tryMove(0, -1);
         } else if (event.key === 'ArrowDown') {
           event.preventDefault();
-          setAtlasFocus((prev) => ({ dx: prev.dx, dy: Math.min(extentY, prev.dy + 1) }));
+          tryMove(0, 1);
         }
       };
+      
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [showPages, atlasFocus.dx, atlasFocus.dy, extentX, extentY, pageByRel, closeModal, goToPage]);
+    }, [showPages, atlasFocus, extentX, extentY, pageByRel, closeModal, goToPage, items]);
 
     if (!showPages) return null;
 
@@ -2962,6 +3014,24 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               const pageName = pageId !== undefined ? config.pageNames?.[pageId] ?? '' : '';
               const itemsInPage = pageId !== undefined ? items.filter((item) => (item.pageIndex ?? 0) === pageId) : [];
               const isHome = pageId === 0;
+              const hasContent = itemsInPage.length > 0;
+              const isUsefulHere = isHome || hasContent;
+
+              const neighbourRelCoords: Array<[number, number]> = [
+                [cell.dx + 1, cell.dy],
+                [cell.dx - 1, cell.dy],
+                [cell.dx, cell.dy + 1],
+                [cell.dx, cell.dy - 1]
+              ];
+              const hasNeighbourUseful = neighbourRelCoords.some(([nx, ny]) => {
+                const entry = pageByRel.get(`${nx},${ny}`);
+                if (!entry) return false;
+                if (entry.id === 0) return true;
+                return items.some((item) => (item.pageIndex ?? 0) === entry.id);
+              });
+
+              const hasCard = isUsefulHere || hasNeighbourUseful;
+
               const isFocused = atlasFocus.dx === cell.dx && atlasFocus.dy === cell.dy;
               return (
                 <div
@@ -2992,7 +3062,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     pageDragIdRef.current = null;
                   }}
                   onClick={() => {
-                    if (pageId === undefined) return;
+                    if (!hasCard || pageId === undefined) return;
                     if (pageId === 0) {
                       goToPage(0);
                       return;
@@ -3000,17 +3070,19 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     if (isPagesEditMode) return;
                     goToPage(pageId);
                   }}
-                  className={`relative rounded-2xl border transition cursor-pointer ${
-                    isEmpty
-                      ? isPagesEditMode
-                        ? 'border-dashed border-white/20 bg-white/5'
-                        : 'border-white/5 bg-white/5'
-                      : isActive
-                        ? 'border-blue-500 shadow-lg shadow-blue-500/30 bg-slate-800/80'
-                        : 'border-white/10 bg-slate-800/60 hover:border-white/30'
+                  className={`relative rounded-2xl border transition ${
+                    !hasCard && !isPagesEditMode
+                      ? 'border-transparent bg-transparent cursor-default'
+                      : isEmpty
+                        ? isPagesEditMode
+                          ? 'border-dashed border-white/20 bg-white/5 cursor-pointer'
+                          : 'border-white/5 bg-white/5 cursor-default'
+                        : isActive
+                          ? 'border-blue-500 shadow-lg shadow-blue-500/30 bg-slate-800/80 cursor-pointer'
+                          : 'border-white/10 bg-slate-800/60 hover:border-white/30 cursor-pointer'
                   } ${isFocused ? 'ring-2 ring-white/60' : ''}`}
                 >
-                  {pageId !== undefined ? (
+                  {pageId !== undefined && hasCard ? (
                     <div className="h-full p-3 flex flex-col">
                       <div className="flex items-center justify-between text-[10px] text-slate-400">
                         <span>
@@ -3332,20 +3404,52 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               const dx = colIndex - pageDotMeta.extentX;
               const dy = rowIndex - pageDotMeta.extentY;
               const pageId = pageDotMeta.map.get(`${dx},${dy}`);
+
               const isMain = pageId === 0;
               const isCurrent = pageId === currentPageId;
-              const isEmpty = pageId === undefined;
+
+              // Une case est "voisine accessible" si au moins une des
+              // 4 cases adjacentes contient une page « utile » :
+              // - HOME (id 0)
+              // - ou une page qui contient au moins un item.
+              const neighbourCoords: Array<[number, number]> = [
+                [dx + 1, dy],
+                [dx - 1, dy],
+                [dx, dy + 1],
+                [dx, dy - 1]
+              ];
+              const hasNeighbourPage = neighbourCoords.some(([nx, ny]) => {
+                const neighbourId = pageDotMeta.map.get(`${nx},${ny}`);
+                if (neighbourId === undefined) return false;
+                if (neighbourId === 0) return true; // HOME toujours considérée comme « pleine »
+                return items.some((item) => (item.pageIndex ?? 0) === neighbourId);
+              });
+
+              const hasContent =
+                pageId !== undefined &&
+                items.some((item) => (item.pageIndex ?? 0) === pageId);
+
+              const isUsefulHere = isMain || hasContent;
+
+              // On affiche un dot si :
+              // - la case contient une page « utile » (HOME ou avec contenu)
+              // - ou si c’est une case (page ou vide) immédiatement voisine
+              //   d’une page utile.
+              const hasDot = isUsefulHere || hasNeighbourPage;
+
               return (
                 <div
                   key={`${rowIndex}-${colIndex}`}
                   className={`rounded-full transition-all ${
-                    isCurrent
-                      ? 'bg-white scale-125'
-                      : isMain
-                        ? 'bg-white/70'
-                        : isEmpty
-                          ? 'bg-white/15'
-                          : 'bg-white/35'
+                    !hasDot
+                      ? 'bg-transparent'
+                      : isCurrent
+                        ? 'bg-white scale-125'
+                        : isMain
+                          ? 'bg-sky-300'
+                          : pageId !== undefined && hasContent
+                            ? 'bg-white/60'
+                            : 'bg-white/10'
                   }`}
                   style={{
                     width: `${dotSize}px`,
@@ -3406,5 +3510,3 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     </div>
   );
 };
-
-

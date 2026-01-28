@@ -1,6 +1,6 @@
 {
-  "id": "obsidian-webos",
-  "name": "Obsidian WebOS",
+  "id": "obsidian-nova",
+  "name": "Obsidian Nova",
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
   "description": "Desktop-like WebOS interface inside an Obsidian view.",

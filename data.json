@@ -69,8 +69,8 @@
       "html": "<div class=\"flex flex-col h-full p-2 bg-gray-800\">\n    <div id=\"disp\" class=\"flex-1 bg-black/40 text-white flex items-center justify-end px-3 rounded mb-2 text-3xl font-light tracking-widest overflow-hidden\">0</div>\n    <div class=\"grid grid-cols-4 gap-2 h-4/5\">\n        <button class=\"btn bg-gray-600\" onclick=\"clr()\">C</button>\n        <button class=\"btn bg-gray-600\" onclick=\"app('/')\">÷</button>\n        <button class=\"btn bg-gray-600\" onclick=\"app('*')\">×</button>\n        <button class=\"btn bg-orange-500\" onclick=\"app('-')\">-</button>\n        <button class=\"btn bg-gray-700\" onclick=\"app('7')\">7</button>\n        <button class=\"btn bg-gray-700\" onclick=\"app('8')\">8</button>\n        <button class=\"btn bg-gray-700\" onclick=\"app('9')\">9</button>\n        <button class=\"btn bg-orange-500\" onclick=\"app('+')\">+</button>\n        <button class=\"btn bg-gray-700\" onclick=\"app('4')\">4</button>\n        <button class=\"btn bg-gray-700\" onclick=\"app('5')\">5</button>\n        <button class=\"btn bg-gray-700\" onclick=\"app('6')\">6</button>\n        <button class=\"btn bg-blue-600 row-span-2\" onclick=\"calc()\">=</button>\n        <button class=\"btn bg-gray-700\" onclick=\"app('1')\">1</button>\n        <button class=\"btn bg-gray-700\" onclick=\"app('2')\">2</button>\n        <button class=\"btn bg-gray-700\" onclick=\"app('3')\">3</button>\n        <button class=\"btn bg-gray-700 col-span-2\" onclick=\"app('0')\">0</button>\n        <button class=\"btn bg-gray-700\" onclick=\"app('.')\">.</button>\n    </div>\n</div>",
       "css": ".btn { border-radius: 8px; color: white; font-weight: bold; transition: all 0.1s; border: 1px solid rgba(255,255,255,0.05); } .btn:active { transform: scale(0.95); filter: brightness(1.2); }",
       "js": "const d = container.querySelector('#disp');\nlet c = '';\ncontainer.querySelectorAll('button').forEach(b => {\n    const t = b.innerText;\n    if(t === '=') b.onclick = () => { try { c = eval(c).toString(); d.innerText = c.substring(0,10); } catch { d.innerText = 'Err'; c=''; } };\n    else if(t === 'C') b.onclick = () => { c = ''; d.innerText = '0'; };\n    else b.onclick = () => { if(d.innerText==='0') c=''; c += (t==='×'?'*':t==='÷'?'/':t); d.innerText = c; };\n});",
-      "x": 8,
-      "y": 6
+      "x": 9,
+      "y": 7
     },
     {
       "id": "widget-tictactoe",
@@ -124,12 +124,12 @@
       "title": "Hydratation Pro",
       "widgetId": "widget-water-adv",
       "cols": 2,
-      "rows": 5,
+      "rows": 2,
       "bgColor": "#3b82f6",
       "html": "<div class=\"relative flex flex-col h-full bg-blue-900 overflow-hidden group\">\n    \n    <div id=\"water-level\" class=\"absolute bottom-0 w-full bg-blue-500 transition-all duration-700 ease-in-out z-0 opacity-80\" style=\"height: 0%\">\n         <div class=\"absolute top-0 w-full h-4 bg-blue-400 opacity-50 animate-pulse\"></div>\n    </div>\n    \n    \n    <div class=\"relative z-10 flex flex-col items-center justify-between h-full py-4\">\n        <div class=\"text-white font-bold text-xl drop-shadow-md\">Objectif</div>\n        <div class=\"text-4xl font-black text-white drop-shadow-lg\"><span id=\"count\">0</span><span class=\"text-sm opacity-60 font-normal\">/8</span></div>\n        \n        <div class=\"flex gap-2\">\n            <button id=\"minus\" class=\"w-8 h-8 rounded-full bg-black/20 text-white hover:bg-black/40 text-xl flex items-center justify-center transition\">-</button>\n            <button id=\"plus\" class=\"w-8 h-8 rounded-full bg-white text-blue-600 hover:bg-blue-50 shadow-lg text-xl flex items-center justify-center transition transform active:scale-90\">+</button>\n        </div>\n    </div>\n    \n    \n    <div class=\"bubble w-2 h-2 bg-white/20 absolute bottom-0 left-2 rounded-full animate-bounce\" style=\"animation-duration: 2s\"></div>\n    <div class=\"bubble w-3 h-3 bg-white/20 absolute bottom-0 right-4 rounded-full animate-bounce\" style=\"animation-duration: 3s\"></div>\n</div>",
       "css": "",
       "js": "const c = container.querySelector('#count');\nconst w = container.querySelector('#water-level');\nlet val = parseInt(localStorage.getItem('w-water')||'0');\nconst max = 8;\nconst up = () => { \n    c.innerText = val; \n    w.style.height = (val/max * 100) + '%';\n    localStorage.setItem('w-water', val); \n};\ncontainer.querySelector('#plus').onclick = () => { if(val<max) val++; up(); };\ncontainer.querySelector('#minus').onclick = () => { if(val>0) val--; up(); };\nup();",
-      "x": 11,
+      "x": 15,
       "y": 8
     },
     {
@@ -204,16 +204,44 @@
       "css": ".rps-root { height: 100%; padding: 10px; color: #e2e8f0; border-radius: 14px; background: radial-gradient(circle at top, rgba(59,130,246,0.2), transparent 60%), linear-gradient(135deg, #0f172a, #111827 60%); border: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 6px; }\n.rps-head { display: flex; align-items: center; justify-content: space-between; }\n.rps-title { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: #93c5fd; font-weight: 700; }\n.rps-score { font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 999px; }\n.rps-arena { flex: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }\n.rps-side { text-align: center; }\n.rps-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #94a3b8; }\n.rps-hand { font-size: 30px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.4)); transition: transform 0.2s; }\n.rps-vs { font-size: 10px; letter-spacing: 0.4em; color: #64748b; }\n.rps-msg { font-size: 10px; text-align: center; color: #e2e8f0; }\n.rps-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }\n.rps-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 10px; padding: 6px 0; font-size: 18px; cursor: pointer; transition: transform 0.1s, background 0.2s, box-shadow 0.2s; }\n.rps-btn:hover { background: rgba(59,130,246,0.3); box-shadow: 0 0 12px rgba(59,130,246,0.35); }\n.rps-btn:active { transform: scale(0.95) rotate(-2deg); }\n.rps-pop { animation: rps-pop 0.25s ease; }\n@keyframes rps-pop { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }",
       "js": "const you = container.querySelector('#rps-you');\nconst cpu = container.querySelector('#rps-cpu');\nconst msg = container.querySelector('#rps-msg');\nconst score = container.querySelector('#rps-score');\nconst icons = { rock: '✊', paper: '✋', scissors: '✌️' };\nconst moves = ['rock', 'paper', 'scissors'];\nlet youScore = 0;\nlet cpuScore = 0;\n\nconst decide = (a, b) => {\n  if (a === b) return 'draw';\n  if ((a === 'rock' && b === 'scissors') || (a === 'paper' && b === 'rock') || (a === 'scissors' && b === 'paper')) {\n    return 'win';\n  }\n  return 'lose';\n};\n\nconst pop = (el) => {\n  if (!el) return;\n  el.classList.remove('rps-pop');\n  void el.offsetWidth;\n  el.classList.add('rps-pop');\n};\n\ncontainer.querySelectorAll('.rps-btn').forEach((btn) => {\n  btn.onclick = () => {\n    const choice = btn.getAttribute('data-move');\n    if (!choice) return;\n    const cpuChoice = moves[Math.floor(Math.random() * moves.length)];\n    if (you) you.innerText = icons[choice];\n    if (cpu) cpu.innerText = icons[cpuChoice];\n    pop(you); pop(cpu);\n    const result = decide(choice, cpuChoice);\n    if (result === 'win') {\n      youScore += 1;\n      if (msg) msg.innerText = 'Bien joue !';\n    } else if (result === 'lose') {\n      cpuScore += 1;\n      if (msg) msg.innerText = 'Ouch... encore !';\n    } else {\n      if (msg) msg.innerText = 'Egalite !';\n    }\n    if (score) score.innerText = youScore + ' - ' + cpuScore;\n  };\n});",
       "x": 11,
-      "y": 6,
+      "y": 12,
       "pageIndex": 0
+    },
+    {
+      "id": "widget-1769611762031",
+      "type": "widget",
+      "title": "Calendrier",
+      "widgetId": "calendar",
+      "cols": 2,
+      "rows": 2,
+      "bgColor": "#ffffff",
+      "html": "<div class=\"h-full flex flex-col p-2 text-slate-800\">\n      <div class=\"text-center font-bold text-red-500 uppercase text-xs mb-1\" id=\"month\">Month</div>\n      <div class=\"text-center text-4xl font-bold flex-1 flex items-center justify-center\" id=\"day\">1</div>\n      <div class=\"text-center text-xs opacity-50\" id=\"weekday\">Day</div>\n    </div>",
+      "js": "const now = new Date();\n    container.querySelector('#month').innerText = now.toLocaleString('default', { month: 'long' });\n    container.querySelector('#day').innerText = now.getDate();\n    container.querySelector('#weekday').innerText = now.toLocaleString('default', { weekday: 'long' });",
+      "x": 7,
+      "y": 5,
+      "pageIndex": 0
+    },
+    {
+      "id": "widget-1769614872419",
+      "type": "widget",
+      "title": "Pomodoro",
+      "widgetId": "pomodoro",
+      "cols": 2,
+      "rows": 2,
+      "bgColor": "#e11d48",
+      "html": "<div class=\"flex flex-col items-center justify-center h-full text-white\">\n      <div class=\"text-4xl font-mono font-bold mb-2\" id=\"timer\">25:00</div>\n      <div class=\"flex gap-2\">\n        <button id=\"start\" class=\"w-8 h-8 rounded-full border-2 border-white flex items-center justify-center hover:bg-white hover:text-red-600 transition\">></button>\n        <button id=\"reset\" class=\"w-8 h-8 rounded-full border-2 border-white flex items-center justify-center hover:bg-white hover:text-red-600 transition\">R</button>\n      </div>\n    </div>",
+      "js": "let time = 1500; let int = null;\n    const disp = container.querySelector('#timer');\n    const update = () => {\n      const minutes = Math.floor(time / 60).toString().padStart(2,'0');\n      const seconds = (time % 60).toString().padStart(2,'0');\n      disp.innerText = minutes + ':' + seconds;\n    };\n    container.querySelector('#start').onclick = () => {\n      if(int) { clearInterval(int); int=null; }\n      else { int = setInterval(() => { if(time>0) { time--; update(); } else { clearInterval(int); alert('Fini!'); } }, 1000); }\n    };\n    container.querySelector('#reset').onclick = () => { clearInterval(int); int=null; time=1500; update(); };\n    container._cleanup = () => clearInterval(int);",
+      "x": 1,
+      "y": 1,
+      "pageIndex": 2
     }
   ],
   "config": {
     "barPosition": "bottom",
     "wallpaper": "https://images.unsplash.com/photo-1477346611705-65d1883cee1e?auto=format&fit=crop&w=2070&q=80",
-    "viewMode": "desktop",
+    "viewMode": "grid",
     "theme": "dark",
-    "swipeThreshold": 79,
+    "swipeThreshold": 30,
     "lockVerticalSwipe": false,
     "transparentObsidgetWidgets": true,
     "fullscreenWidgetTransparent": false,
@@ -227,7 +255,7 @@
         "y": 1
       },
       "2": {
-        "x": 0,
+        "x": 1,
         "y": -1
       },
       "3": {
@@ -235,6 +263,54 @@
         "y": 0
       },
       "4": {
+        "x": -2,
+        "y": -1
+      },
+      "5": {
+        "x": 2,
+        "y": 0
+      },
+      "6": {
+        "x": 2,
+        "y": -2
+      },
+      "7": {
+        "x": 1,
+        "y": 1
+      },
+      "8": {
+        "x": 0,
+        "y": -2
+      },
+      "9": {
+        "x": -2,
+        "y": 0
+      },
+      "10": {
+        "x": -2,
+        "y": -2
+      },
+      "11": {
+        "x": -1,
+        "y": -2
+      },
+      "12": {
+        "x": -1,
+        "y": -1
+      },
+      "13": {
+        "x": 1,
+        "y": -2
+      },
+      "14": {
+        "x": 2,
+        "y": -1
+      },
+      "15": {
+        "x": 0,
+        "y": -1
+      },
+      "16": {
         "x": 1,
         "y": 0
       }
@@ -244,11 +320,20 @@
       1,
       2,
       3,
-      4
-    ],
-    "pageNames": {
-      "0": "mai"
-    }
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16
+    ]
   },
   "windows": [],
   "widgetTemplates": [
