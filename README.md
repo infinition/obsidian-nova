@@ -1,5 +1,6 @@
 # Obsidian Nova
 
+
 Obsidian Nova converts an Obsidian vault into a small desktop/dashboard environment. It provides a widget-driven, multi-page workspace with a dock, movable windows, a Finder-like file browser and support for both plain HTML/CSS/JS widgets and Obsidget-compatible templates.
 
 
