@@ -2,7 +2,6 @@
 
 Obsidian Nova converts an Obsidian vault into a small desktop/dashboard environment. It provides a widget-driven, multi-page workspace with a dock, movable windows, a Finder-like file browser and support for both plain HTML/CSS/JS widgets and Obsidget-compatible templates.
 
-This README was updated after scanning the source to reflect implemented features, developer tooling and release workflow notes.
 
 ---
 
@@ -150,8 +149,6 @@ Notes:
 	2. Run the dev build and test locally in a vault.
 	3. Open a PR with a short description and screenshots.
 
-If you want, I can apply the `manifest.json` and `package.json` name changes and update the release workflow to produce a correctly-named zip and release assets.
-
 ---
 
 ## License
@@ -159,10 +156,3 @@ If you want, I can apply the `manifest.json` and `package.json` name changes and
 See the `LICENSE` file included in the repository.
 
 ---
-
-Any edits you want me to apply now? I can:
-1. Update `manifest.json` and `package.json` to `obsidian-nova`.
-2. Patch `.github/workflows/release.yml` to produce `obsidian-nova.zip` and upload the correct assets.
-3. Run a local build (`npm ci && npm run build`) and check `main.js` (I can run this in the repo if you want me to).
-
-Tell me which of these you'd like me to do next and I will apply the changes.
