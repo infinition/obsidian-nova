@@ -2464,13 +2464,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             <button
               onClick={() => setSettingsTab('navigation')}
               className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${settingsTab === 'navigation'
-<<<<<<< HEAD
                 ? 'bg-blue-600 border-blue-500'
                 : 'bg-white/5 border-white/10 hover:bg-white/10'
-=======
-                ? 'bg-blue-600 border-blue-500'
-                : 'bg-white/5 border-white/10 hover:bg-white/10'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                 }`}
             >
               Navigation
@@ -2506,13 +2501,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                   }))
                 }
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${config.lockVerticalSwipe
-<<<<<<< HEAD
                   ? 'bg-blue-600/30 border-blue-500'
                   : 'bg-slate-800 border-white/10 hover:bg-white/5'
-=======
-                  ? 'bg-blue-600/30 border-blue-500'
-                  : 'bg-slate-800 border-white/10 hover:bg-white/5'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                   }`}
               >
                 <span className="text-sm font-medium">Verrouiller swipe vertical</span>
@@ -2586,13 +2576,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     }))
                   }
                   className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${config.transparentObsidgetWidgets
-<<<<<<< HEAD
                     ? 'bg-blue-600/30 border-blue-500'
                     : 'bg-slate-800 border-white/10 hover:bg-white/5'
-=======
-                    ? 'bg-blue-600/30 border-blue-500'
-                    : 'bg-slate-800 border-white/10 hover:bg-white/5'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                     }`}
                 >
                   <span className="text-sm font-medium">Fond transparent (par défaut)</span>
@@ -2610,13 +2595,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     }))
                   }
                   className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${config.fullscreenWidgetTransparent
-<<<<<<< HEAD
                     ? 'bg-blue-600/30 border-blue-500'
                     : 'bg-slate-800 border-white/10 hover:bg-white/5'
-=======
-                    ? 'bg-blue-600/30 border-blue-500'
-                    : 'bg-slate-800 border-white/10 hover:bg-white/5'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                     }`}
                 >
                   <span className="text-sm font-medium">Fond transparent (plein écran)</span>
@@ -2772,13 +2752,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               <button
                 onClick={() => setWidgetGalleryTab('obsidget')}
                 className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${widgetGalleryTab === 'obsidget'
-<<<<<<< HEAD
                   ? 'bg-blue-600 border-blue-500'
                   : 'bg-white/5 border-white/10 hover:bg-white/10'
-=======
-                  ? 'bg-blue-600 border-blue-500'
-                  : 'bg-white/5 border-white/10 hover:bg-white/10'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                   }`}
               >
                 Obsidget
@@ -3034,21 +3009,12 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     goToPage(pageId);
                   }}
                   className={`relative rounded-2xl border transition cursor-pointer ${isEmpty
-<<<<<<< HEAD
                     ? isPagesEditMode
                       ? 'border-dashed border-white/20 bg-white/5'
                       : 'border-white/5 bg-white/5'
                     : isActive
                       ? 'border-blue-500 shadow-lg shadow-blue-500/30 bg-slate-800/80'
                       : 'border-white/10 bg-slate-800/60 hover:border-white/30'
-=======
-                    ? isPagesEditMode
-                      ? 'border-dashed border-white/20 bg-white/5'
-                      : 'border-white/5 bg-white/5'
-                    : isActive
-                      ? 'border-blue-500 shadow-lg shadow-blue-500/30 bg-slate-800/80'
-                      : 'border-white/10 bg-slate-800/60 hover:border-white/30'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                     } ${isFocused ? 'ring-2 ring-white/60' : ''}`}
                 >
                   {pageId !== undefined ? (
@@ -3239,17 +3205,10 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
 
       <div
         className={`absolute overflow-hidden ${config.barPosition === 'left'
-<<<<<<< HEAD
           ? 'pl-20 pr-4 py-4'
           : config.barPosition === 'right'
             ? 'pr-20 pl-4 py-4'
             : 'px-4'
-=======
-          ? 'pl-20 pr-4 py-4'
-          : config.barPosition === 'right'
-            ? 'pr-20 pl-4 py-4'
-            : 'px-4'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
           }`}
         style={{
           top: topInset,
@@ -3387,21 +3346,12 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                 <div
                   key={`${rowIndex}-${colIndex}`}
                   className={`rounded-full transition-all ${isCurrent
-<<<<<<< HEAD
                     ? 'bg-white scale-125'
                     : isMain
                       ? 'bg-white/70'
                       : isEmpty
                         ? 'bg-white/15'
                         : 'bg-white/35'
-=======
-                    ? 'bg-white scale-125'
-                    : isMain
-                      ? 'bg-white/70'
-                      : isEmpty
-                        ? 'bg-white/15'
-                        : 'bg-white/35'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                     }`}
                   style={{
                     width: `${dotSize}px`,
