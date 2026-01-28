@@ -737,8 +737,14 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
 
+  // Nombre de colonnes fixe pour garantir un layout identique
+  // sur toutes les plateformes (desktop, iPad, mobile).
+  // Sinon, un layout sauvegardé sur 16 colonnes peut se retrouver
+  // « cassé » sur un appareil qui n’en utilise plus que 8 ou 12.
+  const FIXED_GRID_COLS = 16;
+
   const [gridRowHeight, setGridRowHeight] = useState(96);
-  const [gridCols, setGridCols] = useState(8);
+  const [gridCols, setGridCols] = useState(FIXED_GRID_COLS);
 
   // DEBUGGING LOGS (Step 6)
   useEffect(() => {
@@ -1097,24 +1103,15 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const updateGridMetrics = useCallback(() => {
     const container = gridRef.current;
     if (!container) return;
+
     const rect = container.getBoundingClientRect();
-
-    // Safety check for zero width (e.g. on initial load or hidden tab)
-    if (rect.width <= 0) {
-      setGridCols(8);
-      setGridRowHeight(96); // Default sensible value
-      return;
-    }
-
-    let cols = 8;
-    if (rect.width >= 768) cols = 12;
-    if (rect.width >= 1024) cols = 16;
+    const cols = FIXED_GRID_COLS;
     setGridCols(cols);
+
     const gap = 16;
     const colWidth = (rect.width - gap * (cols - 1)) / cols;
-    // Ensure we never have a negative or too small row height
-    setGridRowHeight(Math.max(48, colWidth));
-  }, []);
+    setGridRowHeight(colWidth);
+  }, [FIXED_GRID_COLS]);
 
   useEffect(() => {
     updateGridMetrics();
@@ -2464,13 +2461,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             <button
               onClick={() => setSettingsTab('navigation')}
               className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${settingsTab === 'navigation'
-<<<<<<< HEAD
                 ? 'bg-blue-600 border-blue-500'
                 : 'bg-white/5 border-white/10 hover:bg-white/10'
-=======
-                ? 'bg-blue-600 border-blue-500'
-                : 'bg-white/5 border-white/10 hover:bg-white/10'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                 }`}
             >
               Navigation
@@ -2506,13 +2498,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                   }))
                 }
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${config.lockVerticalSwipe
-<<<<<<< HEAD
                   ? 'bg-blue-600/30 border-blue-500'
                   : 'bg-slate-800 border-white/10 hover:bg-white/5'
-=======
-                  ? 'bg-blue-600/30 border-blue-500'
-                  : 'bg-slate-800 border-white/10 hover:bg-white/5'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                   }`}
               >
                 <span className="text-sm font-medium">Verrouiller swipe vertical</span>
@@ -2586,13 +2573,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     }))
                   }
                   className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${config.transparentObsidgetWidgets
-<<<<<<< HEAD
                     ? 'bg-blue-600/30 border-blue-500'
                     : 'bg-slate-800 border-white/10 hover:bg-white/5'
-=======
-                    ? 'bg-blue-600/30 border-blue-500'
-                    : 'bg-slate-800 border-white/10 hover:bg-white/5'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                     }`}
                 >
                   <span className="text-sm font-medium">Fond transparent (par défaut)</span>
@@ -2610,13 +2592,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     }))
                   }
                   className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border ${config.fullscreenWidgetTransparent
-<<<<<<< HEAD
                     ? 'bg-blue-600/30 border-blue-500'
                     : 'bg-slate-800 border-white/10 hover:bg-white/5'
-=======
-                    ? 'bg-blue-600/30 border-blue-500'
-                    : 'bg-slate-800 border-white/10 hover:bg-white/5'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                     }`}
                 >
                   <span className="text-sm font-medium">Fond transparent (plein écran)</span>
@@ -2772,13 +2749,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               <button
                 onClick={() => setWidgetGalleryTab('obsidget')}
                 className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${widgetGalleryTab === 'obsidget'
-<<<<<<< HEAD
                   ? 'bg-blue-600 border-blue-500'
                   : 'bg-white/5 border-white/10 hover:bg-white/10'
-=======
-                  ? 'bg-blue-600 border-blue-500'
-                  : 'bg-white/5 border-white/10 hover:bg-white/10'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                   }`}
               >
                 Obsidget
@@ -3034,21 +3006,12 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     goToPage(pageId);
                   }}
                   className={`relative rounded-2xl border transition cursor-pointer ${isEmpty
-<<<<<<< HEAD
                     ? isPagesEditMode
                       ? 'border-dashed border-white/20 bg-white/5'
                       : 'border-white/5 bg-white/5'
                     : isActive
                       ? 'border-blue-500 shadow-lg shadow-blue-500/30 bg-slate-800/80'
                       : 'border-white/10 bg-slate-800/60 hover:border-white/30'
-=======
-                    ? isPagesEditMode
-                      ? 'border-dashed border-white/20 bg-white/5'
-                      : 'border-white/5 bg-white/5'
-                    : isActive
-                      ? 'border-blue-500 shadow-lg shadow-blue-500/30 bg-slate-800/80'
-                      : 'border-white/10 bg-slate-800/60 hover:border-white/30'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                     } ${isFocused ? 'ring-2 ring-white/60' : ''}`}
                 >
                   {pageId !== undefined ? (
@@ -3239,17 +3202,10 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
 
       <div
         className={`absolute overflow-hidden ${config.barPosition === 'left'
-<<<<<<< HEAD
           ? 'pl-20 pr-4 py-4'
           : config.barPosition === 'right'
             ? 'pr-20 pl-4 py-4'
             : 'px-4'
-=======
-          ? 'pl-20 pr-4 py-4'
-          : config.barPosition === 'right'
-            ? 'pr-20 pl-4 py-4'
-            : 'px-4'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
           }`}
         style={{
           top: topInset,
@@ -3293,7 +3249,6 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                   ref={pageIdx === currentPageId ? gridRef : null}
                   className="grid gap-x-4 gap-y-6 max-w-7xl mx-auto"
                   style={{
-                    display: 'grid', // Force grid display
                     gridAutoRows: `${gridRowHeight}px`,
                     gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`
                   }}
@@ -3387,21 +3342,12 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                 <div
                   key={`${rowIndex}-${colIndex}`}
                   className={`rounded-full transition-all ${isCurrent
-<<<<<<< HEAD
                     ? 'bg-white scale-125'
                     : isMain
                       ? 'bg-white/70'
                       : isEmpty
                         ? 'bg-white/15'
                         : 'bg-white/35'
-=======
-                    ? 'bg-white scale-125'
-                    : isMain
-                      ? 'bg-white/70'
-                      : isEmpty
-                        ? 'bg-white/15'
-                        : 'bg-white/35'
->>>>>>> 769c3db5df30aa556f3235ffeab3a1d187a8451a
                     }`}
                   style={{
                     width: `${dotSize}px`,
