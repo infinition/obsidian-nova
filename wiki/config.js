@@ -12,7 +12,7 @@ const CONFIG = {
     // Versioning Settings
     versioning: {
         type: "local",
-        manualVersion: "v0.1.0",
+        manualVersion: "",
         manualDate: "2026-01-28"
     },
 
@@ -91,7 +91,7 @@ const CONFIG = {
     // PWA & SEO Settings
     themeColor: "#0B0C0E",
     accentColor: "#22c55e",
-    manifestPath: "manifest.json",
+    manifestPath: "wiki/manifest.pwa.json",
 
     // Social Links
     social: {
