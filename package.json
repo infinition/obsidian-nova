@@ -4,8 +4,8 @@
   "description": "Obsidian WebOS plugin with a desktop-like interface.",
   "main": "main.js",
   "scripts": {
-    "dev": "node esbuild.config.mjs --watch",
-    "build": "node esbuild.config.mjs"
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production"
   },
   "keywords": [],
   "author": "infinition",
