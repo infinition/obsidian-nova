@@ -1,0 +1,10 @@
+node_modules/
+main.js
+styles.css
+main.js.map
+.DS_Store
+*.log
+.vscode/
+dist/
+build/
+data.json
