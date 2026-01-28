@@ -86,19 +86,18 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
   const effectiveBarSize = barSize > 0 ? barSize : defaultBarSize;
   const maxInsets = win.isMaximized
     ? {
-        top: barPosition === 'top' ? effectiveBarSize : 0,
-        right: barPosition === 'right' ? effectiveBarSize : 0,
-        bottom: barPosition === 'bottom' ? effectiveBarSize : 0,
-        left: barPosition === 'left' ? effectiveBarSize : 0
-      }
+      top: barPosition === 'top' ? effectiveBarSize : 0,
+      right: barPosition === 'right' ? effectiveBarSize : 0,
+      bottom: barPosition === 'bottom' ? effectiveBarSize : 0,
+      left: barPosition === 'left' ? effectiveBarSize : 0
+    }
     : null;
 
   return (
     <div
       data-window="true"
-      className={`absolute flex flex-col overflow-hidden rounded-lg shadow-2xl border border-white/20 ${
-        isMobile ? '' : 'backdrop-blur-xl'
-      } transition-all duration-200 ${isMobile ? '' : 'gpu-layer'} ${win.isMaximized ? 'rounded-none' : ''}`}
+      className={`absolute flex flex-col overflow-hidden rounded-lg shadow-2xl border border-white/20 ${isMobile ? '' : 'backdrop-blur-xl'
+        } transition-all duration-200 ${isMobile ? '' : 'gpu-layer'} ${win.isMaximized ? 'rounded-none' : ''}`}
       style={{
         left: win.isMaximized ? maxInsets?.left : win.x,
         top: win.isMaximized ? maxInsets?.top : win.y,
@@ -164,9 +163,9 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
         style={
           win.kind === 'widget'
             ? {
-                backgroundColor: widgetTransparent ? 'transparent' : barColor || 'rgba(15, 23, 42, 0.85)',
-                color: '#fff'
-              }
+              backgroundColor: widgetTransparent ? 'transparent' : barColor || 'rgba(15, 23, 42, 0.85)',
+              color: '#fff'
+            }
             : undefined
         }
       >
