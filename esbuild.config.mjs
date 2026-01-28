@@ -43,7 +43,9 @@ const context = await esbuild.context({
 
 if (prod) {
 	await context.rebuild();
+	await context.dispose(); // Ajoutez cette ligne
 	process.exit(0);
 } else {
 	await context.watch();
+	// Le watch continue en mode dev
 }
