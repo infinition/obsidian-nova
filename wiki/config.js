@@ -12,8 +12,8 @@ const CONFIG = {
     // Versioning Settings
     versioning: {
         type: "local",
-        manualVersion: "v2.0.5",
-        manualDate: "2026-01-28"
+        manualVersion: "v2.0.6",
+        manualDate: "2026-01-29"
     },
 
     // GitHub Repository
