@@ -66,8 +66,8 @@ export const WidgetRunner: React.FC<WidgetRunnerProps> = ({ id, html, css, js, i
       <div
         ref={containerRef}
         className="w-full h-full overflow-hidden"
-        onPointerDown={(e) => !isEditing && e.stopPropagation()}
-        onTouchStart={(e) => !isEditing && e.stopPropagation()}
+        onPointerDown={(e) => !isEditing && !e.altKey && e.stopPropagation()}
+        onTouchStart={(e) => !isEditing && !e.altKey && e.stopPropagation()}
       />
       {isEditing && <div className="absolute inset-0 z-10 bg-transparent cursor-move" />}
     </div>

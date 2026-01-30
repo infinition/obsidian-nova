@@ -9,6 +9,7 @@ interface ObsidgetWidgetRunnerProps {
   isEditing: boolean;
   api: WebOSAPI;
   maxWidth?: { value: number; unit: 'percent' | 'pixel' };
+  onSizeChange?: (size: { width: number; height: number }) => void;
 }
 
 const splitOnDelimiters = (content: string, maxSplits = 3) => {
@@ -61,11 +62,14 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
   js,
   isEditing,
   api,
-  maxWidth
+  maxWidth,
+  onSizeChange
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const lastInitRef = useRef<{ id: string; html?: string; css?: string; js?: string } | null>(null);
+  const resizeRafRef = useRef<number | null>(null);
+  const lastSizeRef = useRef<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +103,20 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
       rootElement.innerHTML = (html || '') + '<slot></slot>';
       shadow.appendChild(rootElement);
       lastInitRef.current = { id, html, css, js };
+    }
+
+    // Ne pas toucher au resize/overflow du widget : le resize natif CSS (resize: both)
+    // reste actif ; la grille suit la taille via ResizeObserver sur root + firstChild.
+
+    if (!isSame) {
+      const resizeHandle = rootElement.querySelector('.obsidget-resize-handle');
+      if (resizeHandle) {
+        container.style.display = 'inline-block';
+        container.style.width = 'fit-content';
+        container.style.height = 'fit-content';
+        container.style.maxWidth = '100%';
+        container.style.maxHeight = '100%';
+      }
     }
 
     const instanceId = id;
@@ -168,6 +186,9 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
         await api.saveWidgetState(instanceId, data);
       },
       getState: async () => api.loadWidgetState(instanceId),
+      reportInitialSize: (width: number, height: number) => {
+        if (width > 0 && height > 0 && onSizeChange) onSizeChange({ width, height });
+      },
       requestUrl: api.requestUrl,
       getFrontmatter: async (path?: string) => api.getFrontmatter(path),
       updateFrontmatter: async (data: Record<string, unknown>, path?: string) =>
@@ -324,13 +345,93 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
     };
   }, [api, css, html, id, js, maxWidth]);
 
+  useEffect(() => {
+    if (!onSizeChange) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const shadow = container.shadowRoot;
+    const rootElement = shadow?.querySelector('[data-root="widget-root"]') as HTMLDivElement | null;
+    if (!rootElement) return;
+    lastSizeRef.current = null;
+
+    const getMaxContentHeight = () => {
+      let maxHeight = rootElement.scrollHeight;
+      const elements = rootElement.querySelectorAll<HTMLElement>('*');
+      elements.forEach((el) => {
+        const h = Math.max(el.scrollHeight, el.offsetHeight);
+        if (h > maxHeight) maxHeight = h;
+      });
+      return maxHeight;
+    };
+
+    const emitSize = (rectOverride?: DOMRectReadOnly) => {
+      const rect = rectOverride ?? rootElement.getBoundingClientRect();
+      const width = rect.width;
+      // Quand on a un rectOverride (ex. resize natif du widget), utiliser ses dimensions exactes
+      const height = rectOverride ? rect.height : Math.max(rect.height, getMaxContentHeight());
+      if (width <= 0 || height <= 0) return;
+      const last = lastSizeRef.current;
+      if (last && Math.abs(last.width - width) < 0.5 && Math.abs(last.height - height) < 0.5) return;
+      lastSizeRef.current = { width, height };
+      onSizeChange({ width, height });
+    };
+
+    const scheduleEmit = () => {
+      if (resizeRafRef.current != null) return;
+      resizeRafRef.current = window.requestAnimationFrame(() => {
+        resizeRafRef.current = null;
+        emitSize();
+      });
+    };
+
+    scheduleEmit();
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (entry?.contentRect) {
+          // Utiliser la taille de l'élément qui a changé (root ou firstChild avec resize:native)
+          emitSize(entry.contentRect);
+          return;
+        }
+        scheduleEmit();
+      });
+      resizeObserver.observe(rootElement);
+      const firstChild = rootElement.firstElementChild as HTMLElement | null;
+      if (firstChild) {
+        resizeObserver.observe(firstChild);
+      }
+    }
+
+    let mutationObserver: MutationObserver | null = null;
+    if (typeof MutationObserver !== 'undefined') {
+      mutationObserver = new MutationObserver(() => scheduleEmit());
+      mutationObserver.observe(rootElement, { childList: true, subtree: true, characterData: true });
+    }
+
+    const pollId = window.setInterval(() => {
+      emitSize();
+    }, 500);
+
+    return () => {
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+      window.clearInterval(pollId);
+      if (resizeRafRef.current != null) {
+        window.cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
+    };
+  }, [css, html, id, js, onSizeChange]);
+
   return (
     <div className="w-full h-full relative">
       <div
         ref={containerRef}
         className="w-full h-full overflow-hidden"
-        onPointerDown={(event) => !isEditing && event.stopPropagation()}
-        onTouchStart={(event) => !isEditing && event.stopPropagation()}
+        onPointerDown={(event) => !isEditing && !event.altKey && event.stopPropagation()}
+        onTouchStart={(event) => !isEditing && !event.altKey && event.stopPropagation()}
       />
       {isEditing && <div className="absolute inset-0 z-10 bg-transparent cursor-move" />}
     </div>

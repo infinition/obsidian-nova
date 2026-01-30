@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { WebOSAPI } from '../../types';
+import type { WebOSAPI } from '../../../types';
 
 const NOTE_PATH = 'WebOS-Note.md';
 
@@ -44,4 +44,3 @@ export const QuickNoteWidget: React.FC<QuickNoteWidgetProps> = ({ api }) => {
     />
   );
 };
-

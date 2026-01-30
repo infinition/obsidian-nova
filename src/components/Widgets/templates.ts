@@ -23,7 +23,7 @@ export const WIDGET_TEMPLATES: WebOSWidgetTemplate[] = [
     container._cleanup = () => clearInterval(interval);`
   },
   {
-    id: 'quick-note',
+    id: 'quicknote',
     title: 'Note rapide',
     cols: 2,
     rows: 2,

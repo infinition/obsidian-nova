@@ -2,19 +2,6 @@ import { TFile, TFolder, normalizePath, requestUrl } from 'obsidian';
 import type { WebOSAPI, WebOSData, VaultEntry } from '../types';
 import type WebOSPlugin from '../main';
 
-const IMAGE_EXTENSIONS = new Set([
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'svg',
-  'webp',
-  'avif',
-  'bmp'
-]);
-
-const isImage = (ext: string | undefined) => !!ext && IMAGE_EXTENSIONS.has(ext.toLowerCase());
-
 const isRemotePath = (value: string) =>
   /^https?:\/\//i.test(value) ||
   /^data:/i.test(value) ||
@@ -43,15 +30,12 @@ const buildTree = (plugin: WebOSPlugin, folder: TFolder): VaultEntry | null => {
       const entry = buildTree(plugin, child);
       if (entry) children.push(entry);
     } else if (child instanceof TFile) {
-      const ext = child.extension;
-      if (ext === 'md' || isImage(ext)) {
-        children.push({
-          path: child.path,
-          name: child.name,
-          type: 'file',
-          extension: ext
-        });
-      }
+      children.push({
+        path: child.path,
+        name: child.name,
+        type: 'file',
+        extension: child.extension
+      });
     }
   }
 

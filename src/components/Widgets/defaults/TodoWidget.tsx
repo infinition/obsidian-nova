@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { WebOSAPI } from '../../types';
+import type { WebOSAPI } from '../../../types';
 
 interface TodoItem {
   text: string;
@@ -108,4 +108,3 @@ export const TodoWidget: React.FC<TodoWidgetProps> = ({ api }) => {
     </div>
   );
 };
-

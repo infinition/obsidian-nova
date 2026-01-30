@@ -20,7 +20,9 @@ export interface WebOSItemBase {
 export interface WebOSAppItem extends WebOSItemBase {
   type: 'app';
   url?: string;
-  appId?: 'finder' | 'browser' | 'custom';
+  appId?: 'finder' | 'browser' | 'custom' | 'pinned-widget';
+  /** Id du widget épinglé au dock (quand appId === 'pinned-widget') */
+  pinnedWidgetItemId?: string;
 }
 
 export interface WebOSFolderItem extends WebOSItemBase {
@@ -52,6 +54,14 @@ export interface WebOSConfig {
   lockVerticalSwipe?: boolean;
   transparentObsidgetWidgets?: boolean;
   fullscreenWidgetTransparent?: boolean;
+  /** Position verticale des indicateurs de page : haut, centre, bas (avec logique dock) */
+  pageDotsPosition?: 'top' | 'center' | 'bottom';
+  /** Taille des points (px), 8–24 */
+  pageDotsSize?: number;
+  /** Durée d'affichage des points avant disparition (ms) */
+  pageDotsDurationMs?: number;
+  /** Bulle floutée sous les points pour lisibilité */
+  pageDotsBlurBubble?: boolean;
 }
 
 export type WindowKind = 'url' | 'finder' | 'image' | 'note' | 'todo' | 'custom' | 'widget';

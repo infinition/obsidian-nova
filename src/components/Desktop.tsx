@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type {
   WebOSAPI,
+  WebOSAppItem,
   WebOSConfig,
   WebOSItem,
   WebOSWidgetItem,
@@ -31,10 +32,11 @@ import { Taskbar } from './Taskbar';
 import { WebViewWindow } from './WebViewWindow';
 import { WindowFrame } from './WindowFrame';
 import { ObsidgetWidgetRunner } from './Widgets/ObsidgetWidgetRunner';
-import { QuickNoteWidget } from './Widgets/QuickNoteWidget';
-import { TodoWidget } from './Widgets/TodoWidget';
+import { QuickNoteWidget } from './Widgets/defaults/QuickNoteWidget';
+import { TodoWidget } from './Widgets/defaults/TodoWidget';
 import { WidgetRunner } from './Widgets/WidgetRunner';
 import { WIDGET_TEMPLATES } from './Widgets/templates';
+import { DEFAULT_ITEMS_BASE, BUILT_IN_APP_TEMPLATES } from './Widgets/defaults';
 
 const WALLPAPERS = [
   'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=2070&q=80',
@@ -126,7 +128,25 @@ const DEFAULT_CONFIG: WebOSConfig = {
   swipeThreshold: 30,
   lockVerticalSwipe: false,
   transparentObsidgetWidgets: true,
-  fullscreenWidgetTransparent: false
+  fullscreenWidgetTransparent: false,
+  pageDotsPosition: 'bottom',
+  pageDotsSize: 12,
+  pageDotsDurationMs: 5000,
+  pageDotsBlurBubble: true
+};
+
+const GRID_GRANULARITY = 4;
+
+const migrateItemsToSubUnits = (items: WebOSItem[]): WebOSItem[] => {
+  const maxCols = items.reduce((m, i) => Math.max(m, i.cols || 1), 0);
+  if (maxCols > 8) return items;
+  return items.map((item) => ({
+    ...item,
+    x: item.x != null ? (item.x - 1) * GRID_GRANULARITY + 1 : undefined,
+    y: item.y != null ? (item.y - 1) * GRID_GRANULARITY + 1 : undefined,
+    cols: (item.cols || 1) * GRID_GRANULARITY,
+    rows: (item.rows || 1) * GRID_GRANULARITY
+  }));
 };
 
 const templateById = (id: string, templates: WebOSWidgetTemplate[]) =>
@@ -167,535 +187,7 @@ const buildWidgetItem = (
 };
 
 const DEFAULT_ITEMS: WebOSItem[] = [
-  {
-    id: 'finder',
-    pageIndex: 0,
-    type: 'app',
-    title: 'Finder',
-    icon: 'F',
-    cols: 1,
-    rows: 1,
-    x: 1,
-    y: 1,
-    dockOrder: 0,
-    bgColor: '#3b82f6',
-    appId: 'finder'
-  },
-  {
-    id: 'browser',
-    pageIndex: 0,
-    dockOrder: 1,
-    type: 'app',
-    title: 'Web',
-    icon: 'W',
-    cols: 1,
-    rows: 1,
-    x: 2,
-    y: 1,
-    bgColor: '#ffffff',
-    url: 'https://obsidian.md'
-  },
-  {
-    id: 'app-youtube',
-    pageIndex: 0,
-    dockOrder: 3,
-    type: 'app',
-    title: 'YouTube',
-    url: 'https://www.youtube.com/embed/jfKfPfyJRdk',
-    icon: '▶️',
-    cols: 1,
-    rows: 1,
-    x: 4,
-    y: 1,
-    bgColor: '#dc2626'
-  },
-  {
-    id: 'widget-btc',
-    pageIndex: 0,
-    type: 'widget',
-    title: 'Bitcoin Pro',
-    widgetId: 'widget-btc',
-    cols: 2,
-    rows: 2,
-    bgColor: '#111827',
-    html: `<div class="flex flex-col justify-between h-full p-3 bg-gradient-to-br from-gray-900 to-black text-white relative overflow-hidden">
-    <div class="absolute top-0 right-0 p-2 opacity-10 text-6xl">₿</div>
-    <div class="flex items-center justify-between z-10">
-        <div class="flex items-center gap-2">
-            <div class="bg-yellow-500 w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold shadow-lg shadow-yellow-500/50">₿</div>
-            <div>
-                <div class="text-xs text-gray-400 font-bold">BITCOIN</div>
-                <div class="text-xs text-green-400 flex items-center">▲ 2.4%</div>
-            </div>
-        </div>
-        <div class="text-2xl font-mono font-bold tracking-tighter" id="price">$96,432</div>
-    </div>
-    <div class="w-full h-8 flex items-end gap-1 mt-auto opacity-50">
-        
-        <div class="bg-green-500 w-1/6 h-2 rounded-t"></div>
-        <div class="bg-green-500 w-1/6 h-4 rounded-t"></div>
-        <div class="bg-green-500 w-1/6 h-3 rounded-t"></div>
-        <div class="bg-green-500 w-1/6 h-6 rounded-t"></div>
-        <div class="bg-green-500 w-1/6 h-5 rounded-t"></div>
-        <div class="bg-green-500 w-1/6 h-8 rounded-t animate-pulse"></div>
-    </div>
-</div>`,
-    css: '',
-    js: `const p = container.querySelector('#price');
-const tick = setInterval(() => {
-    const base = 96000;
-    const rand = Math.floor(Math.random() * 500);
-    p.innerText = '$' + (base + rand).toLocaleString();
-}, 3000);
-container._cleanup = () => clearInterval(tick);`,
-    x: 3,
-    y: 9
-  },
-  {
-    id: 'widget-calc',
-    pageIndex: 0,
-    type: 'widget',
-    title: 'Calculatrice Glass',
-    widgetId: 'widget-calc',
-    cols: 2,
-    rows: 3,
-    bgColor: '#1f2937',
-    html: `<div class="flex flex-col h-full p-2 bg-gray-800">
-    <div id="disp" class="flex-1 bg-black/40 text-white flex items-center justify-end px-3 rounded mb-2 text-3xl font-light tracking-widest overflow-hidden">0</div>
-    <div class="grid grid-cols-4 gap-2 h-4/5">
-        <button class="btn bg-gray-600" onclick="clr()">C</button>
-        <button class="btn bg-gray-600" onclick="app('/')">÷</button>
-        <button class="btn bg-gray-600" onclick="app('*')">×</button>
-        <button class="btn bg-orange-500" onclick="app('-')">-</button>
-        <button class="btn bg-gray-700" onclick="app('7')">7</button>
-        <button class="btn bg-gray-700" onclick="app('8')">8</button>
-        <button class="btn bg-gray-700" onclick="app('9')">9</button>
-        <button class="btn bg-orange-500" onclick="app('+')">+</button>
-        <button class="btn bg-gray-700" onclick="app('4')">4</button>
-        <button class="btn bg-gray-700" onclick="app('5')">5</button>
-        <button class="btn bg-gray-700" onclick="app('6')">6</button>
-        <button class="btn bg-blue-600 row-span-2" onclick="calc()">=</button>
-        <button class="btn bg-gray-700" onclick="app('1')">1</button>
-        <button class="btn bg-gray-700" onclick="app('2')">2</button>
-        <button class="btn bg-gray-700" onclick="app('3')">3</button>
-        <button class="btn bg-gray-700 col-span-2" onclick="app('0')">0</button>
-        <button class="btn bg-gray-700" onclick="app('.')">.</button>
-    </div>
-</div>`,
-    css: `.btn { border-radius: 8px; color: white; font-weight: bold; transition: all 0.1s; border: 1px solid rgba(255,255,255,0.05); } .btn:active { transform: scale(0.95); filter: brightness(1.2); }`,
-    js: `const d = container.querySelector('#disp');
-let c = '';
-container.querySelectorAll('button').forEach(b => {
-    const t = b.innerText;
-    if(t === '=') b.onclick = () => { try { c = eval(c).toString(); d.innerText = c.substring(0,10); } catch { d.innerText = 'Err'; c=''; } };
-    else if(t === 'C') b.onclick = () => { c = ''; d.innerText = '0'; };
-    else b.onclick = () => { if(d.innerText==='0') c=''; c += (t==='×'?'*':t==='÷'?'/':t); d.innerText = c; };
-});`,
-    x: 9,
-    y: 7
-  },
-  {
-    id: 'widget-tictactoe',
-    pageIndex: 0,
-    type: 'widget',
-    title: 'Morpion Neon',
-    widgetId: 'widget-tictactoe',
-    cols: 3,
-    rows: 3,
-    bgColor: '#475569',
-    html: `<div class="relative flex flex-col h-full bg-slate-800 p-2">
-    <div class="flex items-center justify-between mb-1">
-        <span class="text-xs text-gray-400 uppercase tracking-widest">Morpion</span>
-        <button id="reset" class="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white hover:bg-white/20 uppercase tracking-widest">Recommencer</button>
-    </div>
-    <div id="status" class="text-[10px] text-slate-300 mb-1">X commence</div>
-    <div class="grid grid-cols-3 gap-1 flex-1" id="grid"></div>
-    <div id="overlay" class="absolute inset-0 hidden items-center justify-center bg-black/70 backdrop-blur-sm">
-        <div class="bg-slate-900/90 border border-white/10 rounded-xl px-4 py-3 text-center shadow-xl">
-            <div id="winner-text" class="text-lg font-bold text-white mb-2">X a gagne !</div>
-            <button id="play-again" class="px-3 py-1 text-[10px] rounded-full bg-white/10 hover:bg-white/20 text-white uppercase tracking-widest">Recommencer</button>
-        </div>
-    </div>
-</div>`,
-    css: `#grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 6px; flex: 1 1 auto; min-height: 0; align-items: stretch; justify-items: stretch; }
-.cell { background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 900; line-height: 1; color: white; cursor: pointer; border-radius: 6px; transition: background 0.2s, transform 0.1s; aspect-ratio: 1 / 1; width: 100%; height: 100%; padding: 0; min-width: 0; min-height: 0; overflow: hidden; }
-.cell:hover { background: rgba(255,255,255,0.06); }
-.cell:active { transform: scale(0.98); }
-.cell:disabled { cursor: default; }
-.x-mark { color: #f472b6; text-shadow: 0 0 10px rgba(244,114,182,0.8); }
-.o-mark { color: #38bdf8; text-shadow: 0 0 10px rgba(56,189,248,0.8); }
-.win { background: rgba(34,197,94,0.25); box-shadow: inset 0 0 12px rgba(34,197,94,0.6); }`,
-    js: `const g = container.querySelector('#grid');
-const r = container.querySelector('#reset');
-const status = container.querySelector('#status');
-const overlay = container.querySelector('#overlay');
-const winnerText = container.querySelector('#winner-text');
-const playAgain = container.querySelector('#play-again');
-const lines = [
-  [0,1,2],[3,4,5],[6,7,8],
-  [0,3,6],[1,4,7],[2,5,8],
-  [0,4,8],[2,4,6]
-];
-let board = Array(9).fill(null);
-let turn = 'X';
-let isOver = false;
-
-const updateStatus = () => {
-  if (!status) return;
-  status.innerText = isOver ? 'Partie terminee' : turn + ' a toi';
-};
-
-const check = () => {
-  for (const line of lines) {
-    const a = line[0], b = line[1], c = line[2];
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-      return { winner: board[a], line };
-    }
-  }
-  if (board.every(Boolean)) return { winner: 'draw' };
-  return null;
-};
-
-const showOverlay = (text, line) => {
-  if (!overlay || !winnerText) return;
-  winnerText.innerText = text;
-  overlay.classList.remove('hidden');
-  overlay.classList.add('flex');
-  if (line && g) {
-    line.forEach((idx) => {
-      const cell = g.children[idx];
-      if (cell) cell.classList.add('win');
-    });
-  }
-};
-
-const hideOverlay = () => {
-  if (!overlay) return;
-  overlay.classList.add('hidden');
-  overlay.classList.remove('flex');
-};
-
-const render = () => {
-  if (!g) return;
-  g.innerHTML = '';
-  board.forEach((val, idx) => {
-    const d = document.createElement('button');
-    d.type = 'button';
-    d.className = 'cell';
-    if (val) {
-      d.innerText = val;
-      d.classList.add(val === 'X' ? 'x-mark' : 'o-mark');
-    }
-    d.disabled = !!val || isOver;
-    d.onclick = () => {
-      if (board[idx] || isOver) return;
-      board[idx] = turn;
-      const result = check();
-      if (result) {
-        isOver = true;
-      } else {
-        turn = turn === 'X' ? 'O' : 'X';
-      }
-      render();
-      if (result) {
-        if (result.winner === 'draw') showOverlay('Match nul ✨');
-        else showOverlay(result.winner + ' a gagne !', result.line);
-      }
-      updateStatus();
-    };
-    g.appendChild(d);
-  });
-};
-
-const resetGame = () => {
-  board = Array(9).fill(null);
-  turn = 'X';
-  isOver = false;
-  hideOverlay();
-  render();
-  updateStatus();
-};
-
-if (r) r.onclick = resetGame;
-if (playAgain) playAgain.onclick = resetGame;
-render();
-updateStatus();`,
-    x: 13,
-    y: 2
-  },
-  {
-    id: 'widget-system',
-    pageIndex: 0,
-    type: 'widget',
-    title: 'Système Cyber',
-    widgetId: 'widget-system',
-    cols: 2,
-    rows: 2,
-    bgColor: '#000',
-    html: `<div class="flex h-full p-4 gap-4 items-center bg-gray-900 border border-white/10">
-    
-    <div class="flex-1 flex flex-col items-center">
-        <div class="relative w-16 h-16 flex items-center justify-center">
-             <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <path class="text-gray-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="4" />
-                <path id="cpu-circle" class="text-purple-500 drop-shadow-[0_0_5px_rgba(168,85,247,0.8)]" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="4" />
-            </svg>
-            <span class="absolute text-xs font-mono text-purple-300" id="cpu-txt">0%</span>
-        </div>
-        <span class="text-[10px] text-gray-400 mt-1 uppercase">CPU Load</span>
-    </div>
-    
-    <div class="flex-1 flex flex-col justify-center gap-1">
-        <div class="flex justify-between text-[10px] text-cyan-400 font-mono"><span>RAM</span><span id="ram-txt">0GB</span></div>
-        <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
-             <div id="ram-bar" class="h-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.8)] transition-all duration-500" style="width: 0%"></div>
-        </div>
-        <div class="flex justify-between text-[10px] text-pink-400 font-mono mt-1"><span>GPU</span><span id="gpu-txt">0%</span></div>
-        <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
-             <div id="gpu-bar" class="h-full bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.8)] transition-all duration-500" style="width: 0%"></div>
-        </div>
-    </div>
-</div>`,
-    css: '',
-    js: `const setCircle = (el, percent) => { el.setAttribute('stroke-dasharray', percent + ', 100'); };
-const r = () => Math.floor(Math.random()*100);
-const inv = setInterval(() => {
-    const cpu = r(); 
-    const ram = Math.floor(Math.random() * 16);
-    const gpu = r();
-    
-    container.querySelector('#cpu-txt').innerText = cpu+'%';
-    setCircle(container.querySelector('#cpu-circle'), cpu);
-
-    container.querySelector('#ram-txt').innerText = ram + 'GB';
-    container.querySelector('#ram-bar').style.width = (ram/32*100)+'%';
-
-    container.querySelector('#gpu-txt').innerText = gpu+'%';
-    container.querySelector('#gpu-bar').style.width = gpu+'%';
-}, 2000);
-container._cleanup = () => clearInterval(inv);`,
-    x: 3,
-    y: 11
-  },
-  {
-    id: 'widget-ping',
-    pageIndex: 0,
-    type: 'widget',
-    title: 'Ping Radar',
-    widgetId: 'widget-ping',
-    cols: 2,
-    rows: 2,
-    bgColor: '#064e3b',
-    html: `<div class="relative flex flex-col items-center justify-center h-full bg-black overflow-hidden">
-    
-    <div class="absolute inset-0 border border-green-900 rounded-full m-2 opacity-50"></div>
-    <div class="absolute inset-0 border border-green-900 rounded-full m-6 opacity-50"></div>
-    
-    <div class="radar-scan absolute w-full h-full bg-gradient-to-r from-transparent via-green-500/20 to-transparent"></div>
-    
-    <div class="z-10 text-center">
-        <div class="text-3xl font-mono font-bold text-green-400 drop-shadow-[0_0_5px_rgba(74,222,128,0.8)]" id="ping-val">24</div>
-        <div class="text-[10px] text-green-600 uppercase tracking-widest">LATENCY (MS)</div>
-    </div>
-    <div class="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
-</div>`,
-    css: `.radar-scan { animation: scan 2s linear infinite; } @keyframes scan { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`,
-    js: `const el = container.querySelector('#ping-val');
-const inv = setInterval(() => {
-    const ms = 15 + Math.floor(Math.random() * 40);
-    el.innerText = ms;
-    el.style.color = ms > 100 ? '#ef4444' : '#4ade80';
-}, 1000);
-container._cleanup = () => clearInterval(inv);`,
-    x: 9,
-    y: 10
-  },
-  {
-    id: 'widget-water-adv',
-    pageIndex: 0,
-    type: 'widget',
-    title: 'Hydratation Pro',
-    widgetId: 'widget-water-adv',
-    cols: 2,
-    rows: 2,
-    bgColor: '#3b82f6',
-    html: `<div class="relative flex flex-col h-full bg-blue-900 overflow-hidden group">
-    
-    <div id="water-level" class="absolute bottom-0 w-full bg-blue-500 transition-all duration-700 ease-in-out z-0 opacity-80" style="height: 0%">
-         <div class="absolute top-0 w-full h-4 bg-blue-400 opacity-50 animate-pulse"></div>
-    </div>
-    
-    
-    <div class="relative z-10 flex flex-col items-center justify-between h-full py-4">
-        <div class="text-white font-bold text-xl drop-shadow-md">Objectif</div>
-        <div class="text-4xl font-black text-white drop-shadow-lg"><span id="count">0</span><span class="text-sm opacity-60 font-normal">/8</span></div>
-        
-        <div class="flex gap-2">
-            <button id="minus" class="w-8 h-8 rounded-full bg-black/20 text-white hover:bg-black/40 text-xl flex items-center justify-center transition">-</button>
-            <button id="plus" class="w-8 h-8 rounded-full bg-white text-blue-600 hover:bg-blue-50 shadow-lg text-xl flex items-center justify-center transition transform active:scale-90">+</button>
-        </div>
-    </div>
-    
-    
-    <div class="bubble w-2 h-2 bg-white/20 absolute bottom-0 left-2 rounded-full animate-bounce" style="animation-duration: 2s"></div>
-    <div class="bubble w-3 h-3 bg-white/20 absolute bottom-0 right-4 rounded-full animate-bounce" style="animation-duration: 3s"></div>
-</div>`,
-    css: '',
-    js: `const c = container.querySelector('#count');
-const w = container.querySelector('#water-level');
-let val = parseInt(localStorage.getItem('w-water')||'0');
-const max = 8;
-const up = () => { 
-    c.innerText = val; 
-    w.style.height = (val/max * 100) + '%';
-    localStorage.setItem('w-water', val); 
-};
-container.querySelector('#plus').onclick = () => { if(val<max) val++; up(); };
-container.querySelector('#minus').onclick = () => { if(val>0) val--; up(); };
-up();`,
-    x: 15,
-    y: 8
-  },
-  {
-    id: 'widget-coffee',
-    pageIndex: 0,
-    type: 'widget',
-    title: 'Compteur Café',
-    widgetId: 'widget-coffee',
-    cols: 2,
-    rows: 2,
-    bgColor: '#78350f',
-    html: `<div class="flex flex-col items-center justify-center h-full text-[#fef3c7] relative overflow-hidden">
-    <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/coffee.png')] opacity-10"></div>
-    <div class="z-10 flex flex-col items-center">
-        <div class="text-2xl animate-pulse">☕</div>
-        <div class="text-3xl font-bold my-1" id="coffee-count">0</div>
-        <button id="add-coffee" class="bg-[#92400e] hover:bg-[#b45309] text-white text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wide transition shadow-lg">+ Drink</button>
-        <div id="warning" class="hidden text-[10px] text-red-400 font-bold mt-1 bg-black/50 px-1 rounded">SLOW DOWN!</div>
-    </div>
-</div>`,
-    css: '',
-    js: `const d = container.querySelector('#coffee-count');
-const btn = container.querySelector('#add-coffee');
-const warn = container.querySelector('#warning');
-let count = parseInt(localStorage.getItem('w-coffee')||'0');
-
-const render = () => {
-    d.innerText = count;
-    warn.classList.toggle('hidden', count <= 5);
-    d.style.color = count > 5 ? '#ef4444' : '#fef3c7';
-    localStorage.setItem('w-coffee', count);
-};
-btn.onclick = () => { count++; render(); };
-// Reset daily logic could go here
-render();`,
-    x: 15,
-    y: 10
-  },
-  {
-    id: 'widget-kanban',
-    pageIndex: 0,
-    type: 'widget',
-    title: 'Mini Kanban',
-    widgetId: 'widget-kanban',
-    cols: 6,
-    rows: 3,
-    bgColor: '#1e293b',
-    html: `<div class="flex h-full gap-2 p-2 overflow-hidden select-none">
-    
-    <div class="flex-1 flex flex-col bg-slate-800 rounded border border-slate-700/50">
-        <div class="p-2 text-xs font-bold text-gray-400 uppercase border-b border-slate-700">À faire</div>
-        <div class="flex-1 p-1 overflow-y-auto space-y-1 kanban-col" data-status="todo" id="col-todo"></div>
-        <button onclick="addTask()" class="p-1 text-center text-xs text-slate-500 hover:text-slate-300">+ Ajouter</button>
-    </div>
-    
-    <div class="flex-1 flex flex-col bg-slate-800 rounded border border-slate-700/50">
-        <div class="p-2 text-xs font-bold text-blue-400 uppercase border-b border-slate-700">En cours</div>
-        <div class="flex-1 p-1 overflow-y-auto space-y-1 kanban-col" data-status="doing" id="col-doing"></div>
-    </div>
-    
-    <div class="flex-1 flex flex-col bg-slate-800 rounded border border-slate-700/50">
-        <div class="p-2 text-xs font-bold text-green-400 uppercase border-b border-slate-700">Fait</div>
-        <div class="flex-1 p-1 overflow-y-auto space-y-1 kanban-col" data-status="done" id="col-done"></div>
-    </div>
-</div>`,
-    css: `.task-card { background: #334155; padding: 6px; border-radius: 4px; font-size: 11px; color: #e2e8f0; cursor: grab; border-left: 3px solid transparent; } .task-card:active { cursor: grabbing; } .task-todo { border-left-color: #94a3b8; } .task-doing { border-left-color: #60a5fa; } .task-done { border-left-color: #4ade80; opacity: 0.6; text-decoration: line-through; }`,
-    js: `let tasks = JSON.parse(localStorage.getItem('w-kanban') || '[{"id":1, "txt":"Modifier JSON", "st":"doing"}]');
-const render = () => {
-    ['todo','doing','done'].forEach(s => container.querySelector('#col-' + s).innerHTML = '');
-    tasks.forEach(t => {
-        const el = document.createElement('div');
-        el.className = 'task-card task-' + t.st;
-        el.innerText = t.txt;
-        el.draggable = true;
-        el.ondragstart = (e) => { e.dataTransfer.setData('tid', t.id); };
-        // Double click to delete
-        el.ondblclick = () => { if(confirm('Supprimer ?')) { tasks = tasks.filter(x=>x.id!==t.id); save(); } };
-        container.querySelector('#col-' + t.st).appendChild(el);
-    });
-};
-const save = () => { localStorage.setItem('w-kanban', JSON.stringify(tasks)); render(); };
-window.addTask = () => { 
-    const t = prompt('Tâche ?'); 
-    if(t) { tasks.push({id: Date.now(), txt: t, st: 'todo'}); save(); } 
-};
-
-// Drop Logic
-container.querySelectorAll('.kanban-col').forEach(col => {
-    col.ondragover = e => e.preventDefault();
-    col.ondrop = e => {
-        e.preventDefault();
-        const tid = parseInt(e.dataTransfer.getData('tid'));
-        const newSt = col.getAttribute('data-status');
-        const task = tasks.find(t => t.id === tid);
-        if(task && task.st !== newSt) { task.st = newSt; save(); }
-    };
-});
-render();`,
-    x: 3,
-    y: 2
-  },
-  {
-    id: 'widget-ide',
-    pageIndex: 0,
-    type: 'widget',
-    title: 'Mini IDE',
-    widgetId: 'widget-ide',
-    cols: 3,
-    rows: 3,
-    bgColor: '#171717',
-    html: `<div class="flex flex-col h-full text-xs font-mono">
-    <div class="flex justify-between items-center bg-[#262626] px-2 py-1 border-b border-white/10">
-        <span class="text-yellow-500">script.js</span>
-        <button class="bg-green-600 hover:bg-green-700 text-white px-2 rounded flex items-center gap-1 transition" onclick="runCode()">▶ Run</button>
-    </div>
-    <textarea id="code" class="flex-1 bg-[#171717] text-gray-300 p-2 outline-none resize-none" spellcheck="false">// Write JS here
-const a = 10;
-alert('Result: ' + (a * 2));</textarea>
-    <div id="console" class="h-6 bg-black text-gray-500 px-2 flex items-center border-t border-white/10 overflow-hidden whitespace-nowrap">Console ready.</div>
-</div>`,
-    css: `textarea { font-family: 'Fira Code', monospace; line-height: 1.4; }`,
-    js: `const ta = container.querySelector('#code');
-const cons = container.querySelector('#console');
-// Load saved
-ta.value = localStorage.getItem('w-ide') || ta.value;
-ta.addEventListener('input', () => localStorage.setItem('w-ide', ta.value));
-
-window.runCode = () => {
-    try {
-        // Capture console.log roughly
-        const oldLog = console.log;
-        console.log = (msg) => { cons.innerText = '> ' + msg; oldLog(msg); setTimeout(()=>console.log=oldLog, 100); };
-        eval(ta.value);
-        cons.style.color = '#4ade80';
-    } catch (e) {
-        cons.innerText = 'Err: ' + e.message;
-        cons.style.color = '#ef4444';
-    }
-};`,
-    x: 5,
-    y: 8
-  },
+  ...DEFAULT_ITEMS_BASE,
   buildWidgetItem('game-2048', { id: 'widget-2048', x: 9, y: 12, pageIndex: 0 }, WIDGET_TEMPLATES),
   buildWidgetItem('chifoumi', { id: 'widget-chifoumi', x: 11, y: 12, pageIndex: 0 }, WIDGET_TEMPLATES)
 ];
@@ -705,6 +197,419 @@ const PROTECTED_ITEM_IDS = new Set(['finder', 'browser']);
 interface DesktopProps {
   api: WebOSAPI;
 }
+
+/** Composant stable (défini au niveau module) pour que le modal Pages ne soit pas remonté à chaque frappe — garde le focus dans les champs de renommage */
+interface PagesModalStableProps {
+  showPages?: boolean;
+  config: WebOSConfig;
+  setConfig: React.Dispatch<React.SetStateAction<WebOSConfig>>;
+  currentPageId: number;
+  setCurrentPageId: (id: number) => void;
+  setShowPages: (v: boolean) => void;
+  setIsPagesEditMode: (v: boolean) => void;
+  items: WebOSItem[];
+  isPagesEditMode: boolean;
+  pages: number[];
+  getPageCoord: (pageId: number) => { x: number; y: number };
+  currentTheme: { border: string; accent: string; text: string; textMuted: string };
+  pageDragIdRef: React.MutableRefObject<number | null>;
+  pageRenameFocusedRef: React.MutableRefObject<HTMLInputElement | null>;
+  resolveIcon: (icon?: string) => string | undefined;
+  gridColsDisplay: number;
+  gridMaxRows: number;
+  gridGapCol: number;
+  gridRowHeightDisplay: number;
+}
+
+const PagesModalStable = React.memo(function PagesModalStable(props: PagesModalStableProps) {
+  const {
+    config,
+    setConfig,
+    currentPageId,
+    setCurrentPageId,
+    setShowPages,
+    setIsPagesEditMode,
+    items,
+    isPagesEditMode,
+    pages,
+    getPageCoord,
+    currentTheme,
+    pageDragIdRef,
+    pageRenameFocusedRef,
+    resolveIcon,
+    gridColsDisplay,
+    gridMaxRows,
+    gridGapCol,
+    gridRowHeightDisplay
+  } = props;
+  const showPages = true;
+  const [atlasFocus, setAtlasFocus] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  // État local pour le renommage : on n’écrit dans config qu’au blur, pour éviter les re-renders
+  // (barre mise à jour) qui font perdre le focus à l’input.
+  const [editingPageId, setEditingPageId] = useState<number | null>(null);
+  const [editingValue, setEditingValue] = useState('');
+  const baseRows = 10;
+  const rootCoord = getPageCoord(0);
+  const relPages = pages.map((pageId) => {
+    const coord = getPageCoord(pageId);
+    return { id: pageId, dx: coord.x - rootCoord.x, dy: coord.y - rootCoord.y, coord };
+  });
+  let extentX = 0;
+  let extentY = 0;
+  relPages.forEach((entry) => {
+    extentX = Math.max(extentX, Math.abs(entry.dx));
+    extentY = Math.max(extentY, Math.abs(entry.dy));
+  });
+  const mapCols = extentX * 2 + 1;
+  const mapRows = extentY * 2 + 1;
+  const mapGap = 14;
+  const baseCardWidth = 210;
+  const baseCardHeight = 160;
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const panelWidth = viewportWidth;
+  const panelHeight = viewportHeight;
+  const headerHeight = 0;
+  const availableWidth = panelWidth - 48;
+  const availableHeight = panelHeight - headerHeight - 48;
+  const naturalGridWidth = mapCols * baseCardWidth + (mapCols - 1) * mapGap;
+  const naturalGridHeight = mapRows * baseCardHeight + (mapRows - 1) * mapGap;
+  const gridScale = Math.min(1, availableWidth / naturalGridWidth, availableHeight / naturalGridHeight);
+  const pageByRel = new Map<string, { id: number; coord: { x: number; y: number } }>();
+  relPages.forEach((entry) => pageByRel.set(`${entry.dx},${entry.dy}`, { id: entry.id, coord: entry.coord }));
+  const closeModal = () => {
+    setShowPages(false);
+    setIsPagesEditMode(false);
+    pageDragIdRef.current = null;
+    setEditingPageId(null);
+  };
+  const goToPage = (pageId: number) => {
+    setCurrentPageId(pageId);
+    closeModal();
+  };
+  const swapPageCoords = (sourceId: number, targetId: number) => {
+    if (sourceId === 0 || targetId === 0) return;
+    setConfig((prev) => {
+      const coords = { ...(prev.pageCoords ?? {}) };
+      const source = coords[sourceId] ?? { x: 0, y: 0 };
+      const target = coords[targetId] ?? { x: 0, y: 0 };
+      coords[sourceId] = { x: target.x, y: target.y };
+      coords[targetId] = { x: source.x, y: source.y };
+      return { ...prev, pageCoords: coords };
+    });
+  };
+  const movePageToCoord = (pageId: number, coord: { x: number; y: number }) => {
+    if (pageId === 0) return;
+    setConfig((prev) => ({
+      ...prev,
+      pageCoords: { ...(prev.pageCoords ?? {}), [pageId]: { x: coord.x, y: coord.y } }
+    }));
+  };
+  const canFocusAt = (dx: number, dy: number) => {
+    const entry = pageByRel.get(`${dx},${dy}`);
+    const isHome = entry?.id === 0;
+    const itemsInPage = entry ? items.filter((item) => (item.pageIndex ?? 0) === entry.id) : [];
+    const hasContent = itemsInPage.length > 0;
+    const isUsefulHere = isHome || hasContent;
+    if (isUsefulHere) return true;
+    const neighbourRelCoords: Array<[number, number]> = [
+      [dx + 1, dy], [dx - 1, dy], [dx, dy + 1], [dx, dy - 1]
+    ];
+    const hasNeighbourUseful = neighbourRelCoords.some(([nx, ny]) => {
+      const neighbourEntry = pageByRel.get(`${nx},${ny}`);
+      if (!neighbourEntry) return false;
+      if (neighbourEntry.id === 0) return true;
+      return items.some((item) => (item.pageIndex ?? 0) === neighbourEntry.id);
+    });
+    return hasNeighbourUseful;
+  };
+  const canOpenPageAt = (dx: number, dy: number) => {
+    const entry = pageByRel.get(`${dx},${dy}`);
+    if (!entry) return false;
+    const pageId = entry.id;
+    const isHome = pageId === 0;
+    const hasContent = items.some((item) => (item.pageIndex ?? 0) === pageId);
+    const isUsefulHere = isHome || hasContent;
+    const neighbourRelCoords: Array<[number, number]> = [
+      [dx + 1, dy], [dx - 1, dy], [dx, dy + 1], [dx, dy - 1]
+    ];
+    const hasNeighbourUseful = neighbourRelCoords.some(([nx, ny]) => {
+      const neighbourEntry = pageByRel.get(`${nx},${ny}`);
+      if (!neighbourEntry) return false;
+      if (neighbourEntry.id === 0) return true;
+      return items.some((item) => (item.pageIndex ?? 0) === neighbourEntry.id);
+    });
+    return isUsefulHere || hasNeighbourUseful;
+  };
+  useEffect(() => {
+    const current = getPageCoord(currentPageId);
+    setAtlasFocus({ dx: current.x - rootCoord.x, dy: current.y - rootCoord.y });
+  }, [currentPageId, getPageCoord, rootCoord.x, rootCoord.y]);
+  useEffect(() => {
+    if (!isPagesEditMode) {
+      setEditingPageId(null);
+    }
+  }, [isPagesEditMode]);
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('input, textarea, [contenteditable="true"]')) return;
+      const tryMove = (moveX: number, moveY: number) => {
+        const nextDx = atlasFocus.dx + moveX;
+        const nextDy = atlasFocus.dy + moveY;
+        if (nextDx >= -extentX && nextDx <= extentX && nextDy >= -extentY && nextDy <= extentY && canFocusAt(nextDx, nextDy)) {
+          setAtlasFocus({ dx: nextDx, dy: nextDy });
+        }
+      };
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        if (canOpenPageAt(atlasFocus.dx, atlasFocus.dy)) {
+          const entry = pageByRel.get(`${atlasFocus.dx},${atlasFocus.dy}`);
+          if (entry) goToPage(entry.id);
+        }
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeModal();
+        return;
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (canOpenPageAt(atlasFocus.dx, atlasFocus.dy)) {
+          const entry = pageByRel.get(`${atlasFocus.dx},${atlasFocus.dy}`);
+          if (entry) goToPage(entry.id);
+        }
+        return;
+      }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); tryMove(-1, 0); }
+      else if (event.key === 'ArrowRight') { event.preventDefault(); tryMove(1, 0); }
+      else if (event.key === 'ArrowUp') { event.preventDefault(); tryMove(0, -1); }
+      else if (event.key === 'ArrowDown') { event.preventDefault(); tryMove(0, 1); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [atlasFocus, extentX, extentY, pageByRel, closeModal, goToPage, items, canFocusAt, canOpenPageAt]);
+  const cells: Array<{ dx: number; dy: number; pageId?: number; coord: { x: number; y: number } }> = [];
+  for (let y = -extentY; y <= extentY; y += 1) {
+    for (let x = -extentX; x <= extentX; x += 1) {
+      const entry = pageByRel.get(`${x},${y}`);
+      const coord = entry?.coord ?? { x: rootCoord.x + x, y: rootCoord.y + y };
+      cells.push({ dx: x, dy: y, pageId: entry?.id, coord });
+    }
+  }
+  return (
+    <div className="fixed inset-0 z-[85] bg-black/10 backdrop-blur-[2px]" onPointerDown={(e) => e.stopPropagation()} onClick={closeModal}>
+      <div className="absolute inset-0 flex items-center justify-center p-6" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="grid"
+          style={{
+            gridTemplateColumns: `repeat(${mapCols}, ${baseCardWidth}px)`,
+            gridAutoRows: `${baseCardHeight}px`,
+            gap: `${mapGap}px`,
+            transform: `scale(${gridScale})`,
+            transformOrigin: 'top left'
+          }}
+        >
+          {cells.map((cell) => {
+            const pageId = cell.pageId;
+            const isEmpty = pageId === undefined;
+            const isActive = pageId === currentPageId;
+            const pageName = pageId !== undefined ? config.pageNames?.[pageId] ?? '' : '';
+            const itemsInPage = pageId !== undefined ? items.filter((item) => (item.pageIndex ?? 0) === pageId) : [];
+            const isHome = pageId === 0;
+            const hasContent = itemsInPage.length > 0;
+            const isUsefulHere = isHome || hasContent;
+            const neighbourRelCoords: Array<[number, number]> = [
+              [cell.dx + 1, cell.dy], [cell.dx - 1, cell.dy], [cell.dx, cell.dy + 1], [cell.dx, cell.dy - 1]
+            ];
+            const hasNeighbourUseful = neighbourRelCoords.some(([nx, ny]) => {
+              const entry = pageByRel.get(`${nx},${ny}`);
+              if (!entry) return false;
+              if (entry.id === 0) return true;
+              return items.some((item) => (item.pageIndex ?? 0) === entry.id);
+            });
+            const hasCard = isUsefulHere || hasNeighbourUseful;
+            const isFocused = atlasFocus.dx === cell.dx && atlasFocus.dy === cell.dy;
+            return (
+              <div
+                key={`${cell.dx},${cell.dy}`}
+                draggable={!!pageId && isPagesEditMode && pageId !== 0}
+                onDragStart={(event) => {
+                  if (!isPagesEditMode || !pageId || pageId === 0) return;
+                  pageDragIdRef.current = pageId;
+                  event.dataTransfer.setData('text/plain', String(pageId));
+                  event.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(event) => {
+                  if (!isPagesEditMode) return;
+                  event.preventDefault();
+                }}
+                onDrop={(event) => {
+                  if (!isPagesEditMode) return;
+                  event.preventDefault();
+                  const sourceId = pageDragIdRef.current ?? Number(event.dataTransfer.getData('text/plain'));
+                  if (!sourceId || sourceId === pageId || sourceId === 0) return;
+                  if (pageId) {
+                    swapPageCoords(sourceId, pageId);
+                  } else {
+                    movePageToCoord(sourceId, cell.coord);
+                  }
+                }}
+                onDragEnd={() => {
+                  pageDragIdRef.current = null;
+                }}
+                onClick={() => {
+                  if (!hasCard || pageId === undefined) return;
+                  if (pageId === 0) {
+                    goToPage(0);
+                    return;
+                  }
+                  if (isPagesEditMode) return;
+                  goToPage(pageId);
+                }}
+                onPointerEnter={() => setAtlasFocus({ dx: cell.dx, dy: cell.dy })}
+                className={`relative rounded-2xl border transition ${
+                  !hasCard && !isPagesEditMode
+                    ? 'border-transparent bg-transparent cursor-default'
+                    : isEmpty
+                      ? isPagesEditMode
+                        ? 'border-dashed border-white/20 bg-white/5 cursor-pointer'
+                        : 'border-white/5 bg-white/5 cursor-default'
+                      : isActive
+                        ? 'shadow-lg bg-slate-800/80 cursor-pointer'
+                        : 'border-white/10 bg-slate-800/60 hover:border-white/30 cursor-pointer'
+                } ${isFocused ? 'ring-2 ring-white/60' : ''}`}
+                style={isActive ? { borderColor: currentTheme.accent, shadowColor: `${currentTheme.accent}40` } : {}}
+              >
+                {pageId !== undefined && hasCard ? (
+                  <div className="h-full p-3 flex flex-col">
+                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <span>{cell.coord.x},{cell.coord.y}</span>
+                      {isHome && <span className="text-yellow-300">HOME</span>}
+                    </div>
+                    <div className="flex-1 mt-2 rounded-xl bg-slate-900/50 border border-white/5 overflow-hidden">
+                      <div
+                        className="w-full h-full grid gap-px p-2"
+                        style={{
+                          gridTemplateColumns: `repeat(${gridColsDisplay}, minmax(0, 1fr))`,
+                          gridTemplateRows: `repeat(${gridMaxRows}, minmax(0, 1fr))`
+                        }}
+                      >
+                        {itemsInPage.map((item) => {
+                          if (!item.x || !item.y) return null;
+                          const cols = item.cols || 1;
+                          const rows = item.rows || 1;
+                          return (
+                            <div
+                              key={item.id}
+                              className="rounded-[1px] overflow-hidden border border-white/10"
+                              style={{
+                                gridColumnStart: item.x,
+                                gridColumnEnd: `span ${cols}`,
+                                gridRowStart: item.y,
+                                gridRowEnd: `span ${rows}`,
+                                backgroundColor: item.bgColor || '#334155'
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="mt-2 relative">
+                      {isPagesEditMode ? (
+                        <>
+                          <input
+                            value={editingPageId === pageId ? editingValue : pageName}
+                            onFocus={(e) => {
+                              pageRenameFocusedRef.current = e.currentTarget;
+                              if (editingPageId !== null && editingPageId !== pageId) {
+                                setConfig((prev) => ({
+                                  ...prev,
+                                  pageNames: { ...(prev.pageNames ?? {}), [editingPageId]: editingValue }
+                                }));
+                              }
+                              setEditingPageId(pageId);
+                              setEditingValue(pageName);
+                            }}
+                            onBlur={() => {
+                              if (editingPageId === pageId) {
+                                setConfig((prev) => ({
+                                  ...prev,
+                                  pageNames: { ...(prev.pageNames ?? {}), [pageId]: editingValue }
+                                }));
+                                setEditingPageId(null);
+                              }
+                            }}
+                            onChange={(event) => {
+                              const val = (event.target as HTMLInputElement).value;
+                              if (editingPageId === pageId) setEditingValue(val);
+                              else {
+                                setEditingPageId(pageId);
+                                setEditingValue(val);
+                              }
+                            }}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => event.stopPropagation()}
+                            placeholder={`Page ${pageId}`}
+                            className="w-full bg-slate-900/70 border border-white/10 rounded-lg pl-2 pr-7 py-1 text-xs"
+                          />
+                          {(editingPageId === pageId ? editingValue : pageName).length > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setConfig((prev) => ({
+                                  ...prev,
+                                  pageNames: { ...(prev.pageNames ?? {}), [pageId]: '' }
+                                }));
+                                if (editingPageId === pageId) {
+                                  setEditingPageId(null);
+                                  setEditingValue('');
+                                }
+                                setTimeout(() => pageRenameFocusedRef.current?.focus(), 0);
+                              }}
+                              className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-60 hover:opacity-100 hover:bg-white/10"
+                              aria-label="Effacer le nom"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-xs font-semibold text-white truncate">
+                          {pageName && pageName.trim() ? pageName : `Page ${pageId}`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-[10px] text-slate-500">
+                    {isPagesEditMode ? 'Déposer ici' : ''}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <button
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsPagesEditMode((prev) => !prev);
+          }}
+          className={`fixed top-4 right-4 px-3 py-1 rounded-full text-[10px] font-semibold border transition backdrop-blur ${
+            isPagesEditMode ? 'text-white' : 'bg-white/10 border-white/10 text-white/80'
+          }`}
+          style={isPagesEditMode ? { backgroundColor: `${currentTheme.accent}AA`, borderColor: currentTheme.accent } : {}}
+        >
+          {isPagesEditMode ? 'Terminer' : 'Edit'}
+        </button>
+      </div>
+    </div>
+  );
+});
 
 interface DragPlaceholder {
   x: number;
@@ -744,11 +649,14 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [showWidgetGallery, setShowWidgetGallery] = useState(false);
   const [widgetGalleryTab, setWidgetGalleryTab] = useState<'all' | 'os' | 'obsidget'>('all');
+  const [widgetGallerySearch, setWidgetGallerySearch] = useState('');
   const [showPages, setShowPages] = useState(false);
   const [isPagesEditMode, setIsPagesEditMode] = useState(false);
   const [fullscreenWidgetId, setFullscreenWidgetId] = useState<string | null>(null);
   const [showPageDots, setShowPageDots] = useState(true);
+  const [dotsExiting, setDotsExiting] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'general' | 'appearance' | 'wallpapers'>('general');
+  const [wallpaperExpandedSection, setWallpaperExpandedSection] = useState<string | null>(null);
   const [pageSnapOffset, setPageSnapOffset] = useState({ x: 0, y: 0 });
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -761,6 +669,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     draggedPos: { x: number; y: number };
   } | null>(null);
   const [resizeHandle, setResizeHandle] = useState<ResizeHandle | null>(null);
+  const [altKeyHeld, setAltKeyHeld] = useState(false);
 
   const zIndexCounter = useRef(100);
   const dragItemRef = useRef<WebOSItem | null>(null);
@@ -771,9 +680,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const pageFlipTimer = useRef<number | null>(null);
   const pageFlipDir = useRef<{ x: number; y: number } | null>(null);
+  const pageFlipStableTimer = useRef<number | null>(null);
+  const pageFlipStablePos = useRef<{ x: number; y: number } | null>(null);
   const pageDragIdRef = useRef<number | null>(null);
   const pageDotsTimerRef = useRef<number | null>(null);
   const wheelLockRef = useRef<number | null>(null);
+  const lastPageChangeTimeRef = useRef<number>(0);
+  const PAGE_CHANGE_COOLDOWN_MS = 550;
   const pageSnapRafRef = useRef<number | null>(null);
   const pageDragAxisRef = useRef<'x' | 'y' | null>(null);
   const backgroundDragRef = useRef<{ x: number; y: number } | null>(null);
@@ -781,15 +694,27 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const pageDragOffsetRef = useRef({ x: 0, y: 0 });
   const pageDragRaf = useRef<number | null>(null);
   const trashRef = useRef<HTMLDivElement | null>(null);
+  const dockContainerRef = useRef<HTMLDivElement | null>(null);
   const pageCreationBudgetRef = useRef(1);
   const isHydrated = useRef(false);
   const saveTimer = useRef<number | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const ignoreNextClickRef = useRef(false);
+  const hasJustDraggedRef = useRef(false);
+  const prevViewModeRef = useRef<string>(DEFAULT_CONFIG.viewMode);
+  const gallerySearchInputRef = useRef<HTMLInputElement>(null);
+  const wallpaperInputFocusedRef = useRef<HTMLInputElement | null>(null);
+  const pageRenameFocusedRef = useRef<HTMLInputElement | null>(null);
 
   const [gridRowHeight, setGridRowHeight] = useState(96);
   const [gridCols, setGridCols] = useState(8);
+
+  const gridColsDisplay = gridCols * GRID_GRANULARITY;
+  const gridRowHeightDisplay = gridRowHeight / GRID_GRANULARITY;
+  const gridGapCol = 16 / GRID_GRANULARITY;
+  const gridGapRow = 24 / GRID_GRANULARITY;
+  const gridMaxRows = 10 * GRID_GRANULARITY;
 
   const currentTheme = useMemo(() => {
     return THEMES[config.theme] || THEMES.dark;
@@ -885,6 +810,24 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
 
   const [wallpaperSrc, setWallpaperSrc] = useState(resolvedWallpaper);
   const isVideoWallpaper = useMemo(() => isVideoPath(wallpaperSrc), [isVideoPath, wallpaperSrc]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') setAltKeyHeld(true);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') setAltKeyHeld(false);
+    };
+    const onBlur = () => setAltKeyHeld(false);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
 
   useEffect(() => {
     setWallpaperSrc(resolvedWallpaper);
@@ -996,11 +939,48 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   }, [pages, currentPageId]);
 
   useEffect(() => {
+    const prev = prevViewModeRef.current;
+    prevViewModeRef.current = config.viewMode;
+    if (config.viewMode !== 'grid' || prev === 'grid') return;
+    setItems((prevItems) => {
+      const updated = prevItems.map((i) => ({ ...i }));
+      updated
+        .filter((i): i is WebOSItem & { type: 'app' } => i.type === 'app')
+        .forEach((app) => {
+          const ax = app.x ?? 0;
+          const ay = app.y ?? 0;
+          const aw = app.cols || 1;
+          const ah = app.rows || 1;
+          const pageIndex = app.pageIndex ?? 0;
+          const overlaps = updated.some(
+            (other) =>
+              other.id !== app.id &&
+              (other.pageIndex ?? 0) === pageIndex &&
+              other.x != null &&
+              other.y != null &&
+              !(
+                (other.x ?? 0) + (other.cols || 1) <= ax ||
+                ax + aw <= (other.x ?? 0) ||
+                (other.y ?? 0) + (other.rows || 1) <= ay ||
+                ay + ah <= (other.y ?? 0)
+              )
+          );
+          if (overlaps) {
+            const slot = findFreeSlotForItems(updated, aw, ah, pageIndex, app.id);
+            app.x = slot.x;
+            app.y = slot.y;
+          }
+        });
+      return updated;
+    });
+  }, [config.viewMode]);
+
+  useEffect(() => {
     let active = true;
     api.loadState().then((data) => {
       if (!active) return;
-      if (data?.items?.length) setItems(data.items);
-      else setItems(DEFAULT_ITEMS);
+      if (data?.items?.length) setItems(migrateItemsToSubUnits(data.items));
+      else setItems(migrateItemsToSubUnits(DEFAULT_ITEMS));
 
       if (data?.config) setConfig({ ...DEFAULT_CONFIG, ...data.config });
       if (data?.windows) {
@@ -1212,12 +1192,29 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     [ensurePageAtCoord, getPageCoord, currentPageId, items]
   );
 
+  const animatePageChange = useCallback(
+    (dx: number, dy: number, allowCreate = true) => {
+      if (Date.now() - lastPageChangeTimeRef.current < PAGE_CHANGE_COOLDOWN_MS) return false;
+      const moved = movePageBy(dx, dy, allowCreate);
+      if (moved) {
+        lastPageChangeTimeRef.current = Date.now();
+        setPageSnapOffset({ x: dx * 100, y: dy * 100 });
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setPageSnapOffset({ x: 0, y: 0 }));
+        });
+      }
+      return moved;
+    },
+    [movePageBy]
+  );
+
   const isWidgetInteractionRef = useRef(false);
   const isPageNavBlocked = false; 
 
-  // ... (Keyboard, wheel, drag/drop handlers unchanged)
+  // Ne pas intercepter les touches quand le focus est dans un champ (recherche, renommage, etc.)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (document.activeElement instanceof HTMLElement && document.activeElement.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (event.key === 'Tab') {
         const activeEl = document.activeElement;
         if (activeEl instanceof Element && activeEl.closest('input, textarea, [contenteditable="true"]')) return;
@@ -1229,19 +1226,19 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         return;
       }
       if (draggingId && dragItemRef.current && !showSettings && !showWidgetGallery && !showPages) {
-        if (event.key === 'ArrowRight') {
-          event.preventDefault();
-          pageCreationBudgetRef.current = 1;
-          if (movePageBy(1, 0)) {
-            setDragPlaceholder(null);
-            setSwapPreview(null);
-          }
+if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        pageCreationBudgetRef.current = 1;
+        if (animatePageChange(1, 0)) {
+          setDragPlaceholder(null);
+          setSwapPreview(null);
+        }
           return;
         }
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
           pageCreationBudgetRef.current = 1;
-          if (movePageBy(-1, 0)) {
+          if (animatePageChange(-1, 0)) {
             setDragPlaceholder(null);
             setSwapPreview(null);
           }
@@ -1251,7 +1248,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           if (config.lockVerticalSwipe) return;
           event.preventDefault();
           pageCreationBudgetRef.current = 1;
-          if (movePageBy(0, -1)) {
+          if (animatePageChange(0, -1)) {
             setDragPlaceholder(null);
             setSwapPreview(null);
           }
@@ -1261,7 +1258,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           if (config.lockVerticalSwipe) return;
           event.preventDefault();
           pageCreationBudgetRef.current = 1;
-          if (movePageBy(0, 1)) {
+          if (animatePageChange(0, 1)) {
             setDragPlaceholder(null);
             setSwapPreview(null);
           }
@@ -1276,42 +1273,54 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       if (event.target instanceof Element && event.target.closest('[data-widget]')) return;
       if (event.key === 'ArrowRight') {
         pageCreationBudgetRef.current = 1;
-        movePageBy(1, 0);
+        animatePageChange(1, 0);
       } else if (event.key === 'ArrowLeft') {
         pageCreationBudgetRef.current = 1;
-        movePageBy(-1, 0);
+        animatePageChange(-1, 0);
       } else if (event.key === 'ArrowUp') {
         if (config.lockVerticalSwipe) return;
         pageCreationBudgetRef.current = 1;
-        movePageBy(0, -1);
+        animatePageChange(0, -1);
       } else if (event.key === 'ArrowDown') {
         if (config.lockVerticalSwipe) return;
         pageCreationBudgetRef.current = 1;
-        movePageBy(0, 1);
+        animatePageChange(0, 1);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [draggingId, showSettings, showWidgetGallery, showPages, isPageNavBlocked, movePageBy, config.lockVerticalSwipe]);
+  }, [draggingId, showSettings, showWidgetGallery, showPages, isPageNavBlocked, animatePageChange, config.lockVerticalSwipe]);
 
   useEffect(() => {
+    if (showWidgetGallery) {
+      const t = window.setTimeout(() => gallerySearchInputRef.current?.focus(), 50);
+      return () => window.clearTimeout(t);
+    }
+  }, [showWidgetGallery]);
+
+  const pageDotsDurationMs = config.pageDotsDurationMs ?? 5000;
+  useEffect(() => {
     setShowPageDots(true);
+    setDotsExiting(false);
     if (pageDotsTimerRef.current) {
       window.clearTimeout(pageDotsTimerRef.current);
       pageDotsTimerRef.current = null;
     }
     if (isPageDragging) return;
     pageDotsTimerRef.current = window.setTimeout(() => {
-      setShowPageDots(false);
       pageDotsTimerRef.current = null;
-    }, 5000);
+      setDotsExiting(true);
+      window.setTimeout(() => {
+        setShowPageDots(false);
+      }, 1000);
+    }, pageDotsDurationMs);
     return () => {
       if (pageDotsTimerRef.current) {
         window.clearTimeout(pageDotsTimerRef.current);
         pageDotsTimerRef.current = null;
       }
     };
-  }, [currentPageId, isPageDragging]);
+  }, [currentPageId, isPageDragging, pageDotsDurationMs]);
 
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
@@ -1324,10 +1333,10 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       pageCreationBudgetRef.current = 1;
       let moved = false;
       if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-        moved = event.deltaX > 0 ? movePageBy(1, 0) : movePageBy(-1, 0);
+        moved = event.deltaX > 0 ? animatePageChange(1, 0) : animatePageChange(-1, 0);
       } else {
         if (config.lockVerticalSwipe) return;
-        moved = event.deltaY > 0 ? movePageBy(0, 1) : movePageBy(0, -1);
+        moved = event.deltaY > 0 ? animatePageChange(0, 1) : animatePageChange(0, -1);
       }
       if (moved) {
         if (wheelLockRef.current) window.clearTimeout(wheelLockRef.current);
@@ -1344,21 +1353,22 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         wheelLockRef.current = null;
       }
     };
-  }, [isEditing, showSettings, showWidgetGallery, showPages, isPageNavBlocked, movePageBy, config.lockVerticalSwipe]);
+  }, [isEditing, showSettings, showWidgetGallery, showPages, isPageNavBlocked, animatePageChange, config.lockVerticalSwipe]);
 
   // ... (PixelToGrid, styles, drag logic unchanged)
   const pixelsToGrid = useCallback(
     (x: number, y: number, rect: DOMRect) => {
-      const gap = 16;
-      const colWidth = (rect.width - gap * (gridCols - 1)) / gridCols;
-      const gridX = Math.floor((x - rect.left) / (colWidth + gap)) + 1;
-      const gridY = Math.floor((y - rect.top) / (gridRowHeight + 24)) + 1;
+      const colWidth = (rect.width - gridGapCol * (gridColsDisplay - 1)) / gridColsDisplay;
+      const cellWidth = colWidth + gridGapCol;
+      const rowHeight = gridRowHeightDisplay + gridGapRow;
+      const gridX = Math.floor((x - rect.left) / cellWidth) + 1;
+      const gridY = Math.floor((y - rect.top) / rowHeight) + 1;
       return {
-        x: Math.max(1, Math.min(gridX, gridCols)),
+        x: Math.max(1, Math.min(gridX, gridColsDisplay)),
         y: Math.max(1, gridY)
       };
     },
-    [gridCols, gridRowHeight]
+    [gridColsDisplay, gridRowHeightDisplay, gridGapCol, gridGapRow]
   );
 
   const getItemStyle = (item: WebOSItem) => {
@@ -1390,9 +1400,11 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   };
 
   const findFreeSlot = (cols: number, rows: number) => {
-    for (let y = 1; y <= 10; y += 1) {
-      for (let x = 1; x <= gridCols - cols + 1; x += 1) {
-        const overlaps = items.some((item) => {
+    const gridItems =
+      config.viewMode === 'desktop' ? items.filter((i) => i.type !== 'app') : items;
+    for (let y = 1; y <= gridMaxRows; y += 1) {
+      for (let x = 1; x <= gridColsDisplay - cols + 1; x += 1) {
+        const overlaps = gridItems.some((item) => {
           if ((item.pageIndex ?? 0) !== currentPageId) return false;
           if (!item.x || !item.y) return false;
           const width = item.cols || 1;
@@ -1412,8 +1424,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     pageIndex: number,
     ignoreId?: string
   ) => {
-    for (let y = 1; y <= 10; y += 1) {
-      for (let x = 1; x <= gridCols - cols + 1; x += 1) {
+    for (let y = 1; y <= gridMaxRows; y += 1) {
+      for (let x = 1; x <= gridColsDisplay - cols + 1; x += 1) {
         const overlaps = list.some((item) => {
           if (item.id === ignoreId) return false;
           if ((item.pageIndex ?? 0) !== pageIndex) return false;
@@ -1449,11 +1461,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         );
       };
 
+      const listToCheck =
+        config.viewMode === 'desktop' ? updated.filter((i) => i.type !== 'app') : updated;
       updated.forEach((item) => {
         if (item.id === resizedId) return;
         if ((item.pageIndex ?? 0) !== pageIndex) return;
         if (overlaps(item)) {
-          const slot = findFreeSlotForItems(updated, item.cols || 1, item.rows || 1, pageIndex, resizedId);
+          const slot = findFreeSlotForItems(listToCheck, item.cols || 1, item.rows || 1, pageIndex, resizedId);
           item.x = slot.x;
           item.y = slot.y;
         }
@@ -1461,6 +1475,93 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       return updated;
     });
   };
+
+  // Dimensions Obsidget : centralisées dans l'item grille (cols/rows). Le widget reste 100%
+  // et remplit la cellule ; onSizeChange met à jour cols/rows → persistance Nova.
+  const handleObsidgetSizeChange = useCallback(
+    (id: string, size: { width: number; height: number }) => {
+      if (!size || size.width <= 0 || size.height <= 0) return;
+      // En mode édition, ne pas appliquer les rapports de taille : évite que les widgets
+      // qui se mettent à jour (timer, etc.) fassent grandir la cellule à chaque refresh.
+      if (isEditing) return;
+      // Bloquer seulement si l'utilisateur est en train de redimensionner/déplacer via Nova
+      if (resizeHandle?.id === id || draggingId === id) return;
+      
+      // Le reste du code reste identique...
+      const container = gridRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const colWidth = (rect.width - gridGapCol * (gridColsDisplay - 1)) / gridColsDisplay;
+      const cellWidth = colWidth + gridGapCol;
+      const cellHeight = gridRowHeightDisplay + gridGapRow;
+      const nextColsRaw = Math.max(1, Math.ceil((size.width + gridGapCol) / cellWidth));
+      const nextRowsRaw = Math.max(1, Math.ceil((size.height + gridGapRow) / cellHeight));
+
+      setItems((prev) => {
+        let changed = false;
+        const updated = prev.map((item) => {
+          if (item.id !== id) return item;
+          const maxCols = item.x ? Math.max(1, gridColsDisplay - item.x + 1) : gridColsDisplay;
+          const maxRows = item.y ? Math.max(1, gridMaxRows - item.y + 1) : gridMaxRows;
+          const currentCols = item.cols || 1;
+          const currentRows = item.rows || 1;
+          const estimatedCurrentWidth = currentCols * cellWidth - gridGapCol;
+          const widthDelta = size.width - estimatedCurrentWidth;
+          const widthGrowThreshold = gridGapCol * 0.5;
+          const widthShrinkThreshold = cellWidth * 0.5;
+          const allowWidthGrow = widthDelta > widthGrowThreshold;
+          const allowWidthShrink = widthDelta < -widthShrinkThreshold;
+          const nextCols = Math.min(allowWidthGrow || allowWidthShrink ? nextColsRaw : currentCols, maxCols);
+          const nextRows = Math.min(nextRowsRaw, maxRows);
+          if (currentCols === nextCols && currentRows === nextRows) return item;
+          changed = true;
+          return { ...item, cols: nextCols, rows: nextRows };
+        });
+        if (!changed) return prev;
+
+        const resized = updated.find((item) => item.id === id);
+        if (!resized || !resized.x || !resized.y) return updated;
+        const pageIndex = resized.pageIndex ?? 0;
+        const width = resized.cols || 1;
+        const height = resized.rows || 1;
+        const overlaps = (item: WebOSItem) => {
+          if (!item.x || !item.y) return false;
+          const w = item.cols || 1;
+          const h = item.rows || 1;
+          return !(
+            item.x + w <= resized.x! ||
+            resized.x! + width <= item.x ||
+            item.y + h <= resized.y! ||
+            resized.y! + height <= item.y
+          );
+        };
+        const listToCheck =
+          config.viewMode === 'desktop' ? updated.filter((i) => i.type !== 'app') : updated;
+        updated.forEach((item) => {
+          if (item.id === id) return;
+          if ((item.pageIndex ?? 0) !== pageIndex) return;
+          if (overlaps(item)) {
+            const slot = findFreeSlotForItems(listToCheck, item.cols || 1, item.rows || 1, pageIndex, id);
+            item.x = slot.x;
+            item.y = slot.y;
+          }
+        });
+        return updated;
+      });
+    },
+    [
+      config.viewMode,
+      draggingId,
+      gridColsDisplay,
+      gridGapCol,
+      gridGapRow,
+      gridMaxRows,
+      gridRowHeightDisplay,
+      isEditing,
+      resizeHandle
+    ]
+  );
 
   const openWindowForItem = (item: WebOSItem, details: Partial<WebOSWindow>) => {
     const existing = windows.find((win) => win.itemId === item.id && win.kind === details.kind);
@@ -1534,16 +1635,57 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     setWindows((prev) => prev.map((win) => (win.id === id ? { ...win, ...updates } : win)));
   };
 
+  const openWidgetWindow = (
+    widgetItem: WebOSWidgetItem,
+    options: { itemId?: string; fullscreen?: boolean }
+  ) => {
+    const itemId = options.itemId ?? widgetItem.id;
+    const existing = windows.find(
+      (w) => w.kind === 'widget' && (options.itemId ? w.itemId === options.itemId : w.widgetItemId === widgetItem.id)
+    );
+    if (existing) {
+      focusWindow(existing.id);
+      if (existing.isMinimized) minimizeWindow(existing.id);
+      return;
+    }
+    const newWindow: WebOSWindow = {
+      id: `widget-${itemId}-${Date.now()}`,
+      itemId,
+      widgetItemId: widgetItem.id,
+      title: widgetItem.title || 'Widget',
+      kind: 'widget',
+      x: 80,
+      y: 80,
+      w: 900,
+      h: 650,
+      zIndex: zIndexCounter.current + 1,
+      isMinimized: false,
+      isMaximized: options.fullscreen ?? false
+    };
+    zIndexCounter.current += 1;
+    setWindows((prev) => [...prev, newWindow]);
+    setActiveWindowId(newWindow.id);
+    if (options.fullscreen) setFullscreenWidgetId(widgetItem.id);
+  };
+
   const launchItem = (item: WebOSItem) => {
     if (item.type !== 'app') return;
-    if (item.appId === 'finder') {
+    const appItem = item as WebOSAppItem;
+    if (appItem.appId === 'pinned-widget' && appItem.pinnedWidgetItemId) {
+      const widgetItem = items.find(
+        (i): i is WebOSWidgetItem => i.type === 'widget' && i.id === appItem.pinnedWidgetItemId
+      );
+      if (widgetItem) openWidgetWindow(widgetItem, { itemId: item.id });
+      return;
+    }
+    if (appItem.appId === 'finder') {
       openWindowForItem(item, { kind: 'finder', title: 'Finder' });
       return;
     }
 
-    if (item.url) {
-      if (item.external) window.open(item.url, '_blank');
-      else openWindowForItem(item, { kind: 'url', url: item.url, title: item.title });
+    if (appItem.url) {
+      if (appItem.external) window.open(appItem.url, '_blank');
+      else openWindowForItem(item, { kind: 'url', url: appItem.url, title: item.title });
     }
   };
 
@@ -1557,7 +1699,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       pageSnapRafRef.current = null;
     }
     pageDragAxisRef.current = null;
-    const hasModifier = event.shiftKey || event.ctrlKey;
+    const hasModifier = event.shiftKey || event.ctrlKey || event.altKey;
     if (hasModifier) {
       modifierDragRef.current = true;
       event.preventDefault();
@@ -1641,17 +1783,21 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       event.preventDefault();
       const diffX = event.clientX - resizeHandle.startX;
       const diffY = event.clientY - resizeHandle.startY;
-      const colDiff = Math.round(diffX / gridRowHeight);
-      const rowDiff = Math.round(diffY / gridRowHeight);
+      const rect = gridRef.current?.getBoundingClientRect();
+      const cellWidthPx = rect ? (rect.width - gridGapCol * (gridColsDisplay - 1)) / gridColsDisplay + gridGapCol : gridRowHeightDisplay + gridGapCol;
+      const cellHeightPx = gridRowHeightDisplay + gridGapRow;
+      const colDiff = Math.round(diffX / cellWidthPx);
+      const rowDiff = Math.round(diffY / cellHeightPx);
       const rawCols = Math.max(1, resizeHandle.startCols + colDiff);
       const rawRows = Math.max(1, resizeHandle.startRows + rowDiff);
       const resizedItem = items.find((item) => item.id === resizeHandle.id);
       if (resizedItem?.x && resizedItem?.y) {
-        const maxCols = Math.max(1, gridCols - resizedItem.x + 1);
+        const maxCols = Math.max(1, gridColsDisplay - resizedItem.x + 1);
         const newCols = Math.min(rawCols, maxCols);
         const newRows = rawRows;
         const overlaps = items.some((item) => {
           if (item.id === resizeHandle.id) return false;
+          if (config.viewMode === 'desktop' && item.type === 'app') return false;
           if ((item.pageIndex ?? 0) !== (resizedItem.pageIndex ?? 0)) return false;
           if (!item.x || !item.y) return false;
           const w = item.cols || 1;
@@ -1676,7 +1822,10 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     setDragPos({ x: event.clientX, y: event.clientY });
 
     if (!isPageNavBlocked) {
-      const edgeThreshold = 48;
+      const edgeThreshold = 24;
+      const stableMs = 350;
+      const stillThresholdPx = 10;
+      const flipDelayMs = 1000;
       const containerRect = gridRef.current?.getBoundingClientRect();
       const rightEdge = containerRect ? containerRect.right : window.innerWidth;
       const leftEdge = containerRect ? containerRect.left : 0;
@@ -1684,29 +1833,78 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       const bottomEdge = containerRect ? containerRect.bottom : window.innerHeight;
 
       const scheduleFlip = (dx: number, dy: number) => {
+        if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+        pageFlipStableTimer.current = null;
+        pageFlipStablePos.current = null;
         const currentDir = pageFlipDir.current;
         if (currentDir && currentDir.x === dx && currentDir.y === dy && pageFlipTimer.current) return;
         if (pageFlipTimer.current) window.clearTimeout(pageFlipTimer.current);
         pageFlipDir.current = { x: dx, y: dy };
         pageFlipTimer.current = window.setTimeout(() => {
           movePageBy(dx, dy);
-        }, 700);
+        }, flipDelayMs);
       };
 
       const clearFlip = () => {
+        if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+        pageFlipStableTimer.current = null;
+        pageFlipStablePos.current = null;
         if (pageFlipTimer.current) window.clearTimeout(pageFlipTimer.current);
         pageFlipTimer.current = null;
         pageFlipDir.current = null;
       };
 
-      if (event.clientX > rightEdge - edgeThreshold) {
-        scheduleFlip(1, 0);
-      } else if (event.clientX < leftEdge + edgeThreshold) {
-        scheduleFlip(-1, 0);
-      } else if (event.clientY > bottomEdge - edgeThreshold) {
-        scheduleFlip(0, 1);
-      } else if (event.clientY < topEdge + edgeThreshold) {
-        scheduleFlip(0, -1);
+      const px = event.clientX;
+      const py = event.clientY;
+      const inRight = px > rightEdge - edgeThreshold;
+      const inLeft = px < leftEdge + edgeThreshold;
+      const inBottom = py > bottomEdge - edgeThreshold;
+      const inTop = py < topEdge + edgeThreshold;
+
+      if (inRight) {
+        const last = pageFlipStablePos.current;
+        const still = !last || (Math.abs(px - last.x) <= stillThresholdPx && Math.abs(py - last.y) <= stillThresholdPx);
+        if (!still) {
+          if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+          pageFlipStableTimer.current = null;
+          pageFlipStablePos.current = { x: px, y: py };
+        } else if (!pageFlipStableTimer.current) {
+          pageFlipStablePos.current = { x: px, y: py };
+          pageFlipStableTimer.current = window.setTimeout(() => scheduleFlip(1, 0), stableMs);
+        }
+      } else if (inLeft) {
+        const last = pageFlipStablePos.current;
+        const still = !last || (Math.abs(px - last.x) <= stillThresholdPx && Math.abs(py - last.y) <= stillThresholdPx);
+        if (!still) {
+          if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+          pageFlipStableTimer.current = null;
+          pageFlipStablePos.current = { x: px, y: py };
+        } else if (!pageFlipStableTimer.current) {
+          pageFlipStablePos.current = { x: px, y: py };
+          pageFlipStableTimer.current = window.setTimeout(() => scheduleFlip(-1, 0), stableMs);
+        }
+      } else if (inBottom) {
+        const last = pageFlipStablePos.current;
+        const still = !last || (Math.abs(px - last.x) <= stillThresholdPx && Math.abs(py - last.y) <= stillThresholdPx);
+        if (!still) {
+          if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+          pageFlipStableTimer.current = null;
+          pageFlipStablePos.current = { x: px, y: py };
+        } else if (!pageFlipStableTimer.current) {
+          pageFlipStablePos.current = { x: px, y: py };
+          pageFlipStableTimer.current = window.setTimeout(() => scheduleFlip(0, 1), stableMs);
+        }
+      } else if (inTop) {
+        const last = pageFlipStablePos.current;
+        const still = !last || (Math.abs(px - last.x) <= stillThresholdPx && Math.abs(py - last.y) <= stillThresholdPx);
+        if (!still) {
+          if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+          pageFlipStableTimer.current = null;
+          pageFlipStablePos.current = { x: px, y: py };
+        } else if (!pageFlipStableTimer.current) {
+          pageFlipStablePos.current = { x: px, y: py };
+          pageFlipStableTimer.current = window.setTimeout(() => scheduleFlip(0, -1), stableMs);
+        }
       } else {
         clearFlip();
       }
@@ -1730,6 +1928,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       const draggedY = dragItemRef.current.y ?? layoutOverrides.get(dragItemRef.current.id)?.y;
       const overlapTarget = items.find((item) => {
         if (item.id === draggingId) return false;
+        if (config.viewMode === 'desktop' && item.type === 'app') return false;
         if ((item.pageIndex ?? 0) !== currentPageId) return false;
         const ix = item.x ?? layoutOverrides.get(item.id)?.x;
         const iy = item.y ?? layoutOverrides.get(item.id)?.y;
@@ -1786,6 +1985,11 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       window.clearTimeout(backgroundLongPressTimer.current);
       backgroundLongPressTimer.current = null;
     }
+    if (pageFlipStableTimer.current) {
+      window.clearTimeout(pageFlipStableTimer.current);
+      pageFlipStableTimer.current = null;
+      pageFlipStablePos.current = null;
+    }
     if (pageFlipTimer.current) {
       window.clearTimeout(pageFlipTimer.current);
       pageFlipTimer.current = null;
@@ -1818,9 +2022,9 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           schedulePageSnap({ x: dragOffset.x, y: dragOffset.y });
         }
       } else if (Math.abs(dx) > swipeThreshold && Math.abs(dy) < swipePerpTolerance) {
-        movePageBy(dx < 0 ? 1 : -1, 0);
+        animatePageChange(dx < 0 ? 1 : -1, 0);
       } else if (Math.abs(dy) > swipeThreshold && Math.abs(dx) < swipePerpTolerance) {
-        if (!config.lockVerticalSwipe) movePageBy(0, dy < 0 ? 1 : -1);
+        if (!config.lockVerticalSwipe) animatePageChange(0, dy < 0 ? 1 : -1);
       }
     }
     if (isPageDragging) {
@@ -1852,6 +2056,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     modifierDragRef.current = false;
 
     if (draggingId && dragItemRef.current) {
+      hasJustDraggedRef.current = true;
       const trashRect = trashRef.current?.getBoundingClientRect();
       const isOverTrash =
         !!trashRect &&
@@ -1869,7 +2074,12 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           const itemY = event.clientY - dragOffset.y;
           const { x, y } = pixelsToGrid(itemX, itemY, rect);
           const colliding = items.find(
-            (item) => item.id !== draggingId && (item.pageIndex ?? 0) === currentPageId && item.x === x && item.y === y
+            (item) =>
+              item.id !== draggingId &&
+              (item.pageIndex ?? 0) === currentPageId &&
+              item.x === x &&
+              item.y === y &&
+              !(config.viewMode === 'desktop' && item.type === 'app')
           );
           if (colliding) {
             const draggedItem = items.find((item) => item.id === draggingId);
@@ -1892,14 +2102,16 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
 
   const addWidget = (template: WebOSWidgetTemplate) => {
     const id = `widget-${Date.now()}`;
-    const { x, y } = findFreeSlot(template.cols, template.rows);
+    const cols = template.cols * GRID_GRANULARITY;
+    const rows = template.rows * GRID_GRANULARITY;
+    const { x, y } = findFreeSlot(cols, rows);
     const newItem: WebOSWidgetItem = {
       id,
       type: 'widget',
       title: template.title,
       widgetId: template.id,
-      cols: template.cols,
-      rows: template.rows,
+      cols,
+      rows,
       bgColor: template.bgColor,
       html: template.source === 'obsidget' ? undefined : template.html,
       css: template.source === 'obsidget' ? undefined : template.css,
@@ -1935,6 +2147,28 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     setShowWidgetGallery(false);
   };
 
+  const addApp = (template: WebOSItem) => {
+    if (template.type !== 'app') return;
+    const existingIds = new Set(items.map((i) => i.id));
+    if (template.id === 'finder' && existingIds.has('finder')) return;
+    const id =
+      template.id === 'browser' && existingIds.has('browser')
+        ? `browser-${Date.now()}`
+        : template.id;
+    const cols = template.cols ?? 1;
+    const rows = template.rows ?? 1;
+    const { x, y } = findFreeSlot(cols, rows);
+    const newItem: WebOSItem = {
+      ...template,
+      id,
+      x,
+      y,
+      pageIndex: currentPageId
+    };
+    setItems((prev) => [...prev, newItem]);
+    setShowWidgetGallery(false);
+  };
+
   const layoutOverrides = useMemo(() => {
     const overrides = new Map<string, { x: number; y: number }>();
     const byPage = new Map<number, WebOSItem[]>();
@@ -1956,8 +2190,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       const place = (item: WebOSItem) => {
         const cols = item.cols || 1;
         const rows = item.rows || 1;
-        for (let y = 1; y <= 10; y += 1) {
-          for (let x = 1; x <= gridCols - cols + 1; x += 1) {
+        for (let y = 1; y <= gridMaxRows; y += 1) {
+          for (let x = 1; x <= gridColsDisplay - cols + 1; x += 1) {
             const overlaps = occupied.some((cell) => {
               return !(
                 cell.x + cell.w <= x ||
@@ -1976,11 +2210,12 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         overrides.set(item.id, { x: 1, y: 1 });
       };
       sorted.forEach((item) => {
+        if (config.viewMode === 'desktop' && item.type === 'app') return;
         const x = item.x ?? 1;
         const y = item.y ?? 1;
         const cols = item.cols || 1;
         const rows = item.rows || 1;
-        if (x + cols - 1 <= gridCols) {
+        if (x + cols - 1 <= gridColsDisplay) {
           const overlaps = occupied.some((cell) => {
             return !(
               cell.x + cell.w <= x ||
@@ -1999,7 +2234,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     });
 
     return overrides;
-  }, [items, gridCols]);
+  }, [items, gridColsDisplay, gridMaxRows, config.viewMode]);
 
   const openDockIds = useMemo(() => {
     return new Set(windows.filter((win) => win.itemId).map((win) => win.itemId as string));
@@ -2064,7 +2299,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     if (backgroundLongPressTimer.current) window.clearTimeout(backgroundLongPressTimer.current);
     backgroundLongPressTimer.current = window.setTimeout(() => {
       setIsEditing(true);
-    }, 3000);
+    }, 2000);
     touchStartRef.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
   };
 
@@ -2145,10 +2380,10 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         schedulePageSnap({ x: dragOffset.x, y: dragOffset.y });
       }
     } else if (Math.abs(diffX) > swipeThreshold && Math.abs(diffY) < swipePerpTolerance) {
-      movePageBy(diffX > 0 ? 1 : -1, 0);
+      animatePageChange(diffX > 0 ? 1 : -1, 0);
     } else if (Math.abs(diffY) > swipeThreshold && Math.abs(diffX) < swipePerpTolerance) {
       if (!config.lockVerticalSwipe) {
-        movePageBy(0, diffY > 0 ? 1 : -1);
+        animatePageChange(0, diffY > 0 ? 1 : -1);
       }
     }
     if (isPageDragging) {
@@ -2158,15 +2393,22 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     touchStartRef.current = null;
   };
 
-  const renderWidget = (item: WebOSWidgetItem, options?: { isEditingOverride?: boolean }) => {
+  const renderWidget = (
+    item: WebOSWidgetItem,
+    options?: {
+      isEditingOverride?: boolean;
+      onSizeChange?: (size: { width: number; height: number }) => void;
+    }
+  ) => {
     const editing = options?.isEditingOverride ?? isEditing;
+    const onSizeChange = options?.onSizeChange;
     const template = widgetTemplates.find((tpl) => tpl.id === item.widgetId);
     const html = item.html ?? template?.html;
     const css = item.css ?? template?.css;
     const js = item.js ?? template?.js;
     const isObsidget = template?.source === 'obsidget';
 
-    if (item.widgetId === 'quick-note') return <QuickNoteWidget api={api} />;
+    if (item.widgetId === 'quicknote' || item.widgetId === 'quick-note') return <QuickNoteWidget api={api} />;
     if (item.widgetId === 'todo') return <TodoWidget api={api} />;
     if (!html && !css && !js && !isObsidget) {
       return (
@@ -2186,6 +2428,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           isEditing={editing}
           api={api}
           maxWidth={obsidgetMaxWidth}
+          onSizeChange={onSizeChange}
         />
       );
     }
@@ -2241,15 +2484,15 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             );
           }}
           onAddWidget={(url) => {
-            const { x, y } = findFreeSlot(1, 1);
+            const { x, y } = findFreeSlot(GRID_GRANULARITY, GRID_GRANULARITY);
             const id = `web-${Date.now()}`;
             const newItem: WebOSItem = {
               id,
               type: 'app',
               title: win.title || 'Web',
               icon: '🌐',
-              cols: 1,
-              rows: 1,
+              cols: GRID_GRANULARITY,
+              rows: GRID_GRANULARITY,
               x,
               y,
               pageIndex: currentPageId,
@@ -2312,24 +2555,36 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       setFullscreenWidgetId(null);
       return;
     }
+    openWidgetWindow(item, { itemId: item.id, fullscreen: true });
+  };
 
-    const newWindow: WebOSWindow = {
-      id: `widget-${item.id}`,
-      itemId: item.id,
-      widgetItemId: item.id,
-      title: item.title || 'Widget',
-      kind: 'widget',
-      x: 80,
-      y: 80,
-      w: 900,
-      h: 650,
-      zIndex: zIndexCounter.current + 1,
-      isMinimized: false,
-      isMaximized: true
+  const addWidgetToDock = (widgetItem: WebOSWidgetItem) => {
+    const alreadyPinned = items.some(
+      (i) => i.type === 'app' && (i as WebOSAppItem).pinnedWidgetItemId === widgetItem.id
+    );
+    if (alreadyPinned) return;
+    const appItems = items.filter((i): i is WebOSAppItem => i.type === 'app');
+    const maxDockOrder = Math.max(0, ...appItems.map((i) => i.dockOrder ?? 0));
+    const newItem: WebOSAppItem = {
+      id: `dock-widget-${widgetItem.id}`,
+      type: 'app',
+      title: widgetItem.title || 'Widget',
+      icon: widgetItem.icon,
+      bgColor: widgetItem.bgColor,
+      appId: 'pinned-widget',
+      pinnedWidgetItemId: widgetItem.id,
+      dockOrder: maxDockOrder + 1
     };
-    zIndexCounter.current += 1;
-    setWindows((prev) => [...prev, newWindow]);
-    setFullscreenWidgetId(item.id);
+    setItems((prev) => [...prev, newItem]);
+  };
+
+  const handlePinToDock = (win: WebOSWindow) => {
+    if (win.kind !== 'widget' || !win.widgetItemId) return;
+    const widgetItem = items.find(
+      (i): i is WebOSWidgetItem => i.type === 'widget' && i.id === win.widgetItemId
+    );
+    if (!widgetItem) return;
+    addWidgetToDock(widgetItem);
   };
 
   const renderItem = (item: WebOSItem) => {
@@ -2338,7 +2593,12 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     const showIconLabel = !isWidget && (item.cols || 1) === 1 && (item.rows || 1) === 1;
     const isObsidgetWidget =
       isWidget && widgetTemplates.find((tpl) => tpl.id === (item as WebOSWidgetItem).widgetId)?.source === 'obsidget';
-    const shouldHideWidgetBg = isObsidgetWidget && config.transparentObsidgetWidgets;
+    const shouldHideWidgetBg = isObsidgetWidget;
+  // ✅ TOUJOURS passer le handler, même en mode édition
+  // handleObsidgetSizeChange décidera lui-même s'il doit bloquer ou non
+  const obsidgetSizeHandler = isObsidgetWidget
+    ? (size: { width: number; height: number }) => handleObsidgetSizeChange(item.id, size)
+    : undefined;
 
     return (
       <div
@@ -2348,6 +2608,10 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         data-widget={isWidget ? 'true' : undefined}
         onClick={(event) => {
             if (isEditing) return;
+            if (hasJustDraggedRef.current) {
+              hasJustDraggedRef.current = false;
+              return;
+            }
             launchItem(item);
         }}
         onPointerEnter={() => {
@@ -2365,7 +2629,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           isWidgetInteractionRef.current = false;
         }}
         onPointerDown={(event) => {
-          const hasModifier = event.shiftKey || event.ctrlKey;
+          const hasModifier = event.shiftKey || event.ctrlKey || event.altKey;
           if (!isEditing && isWidget && !hasModifier) return;
           handlePointerDown(event, item);
         }}
@@ -2396,7 +2660,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         )}
         {isWidget && shouldHideWidgetBg ? (
           <div className="w-full h-full">
-            {renderWidget(item as WebOSWidgetItem)}
+            {renderWidget(item as WebOSWidgetItem, { onSizeChange: obsidgetSizeHandler })}
           </div>
         ) : (
           <div
@@ -2414,7 +2678,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             }
           >
             {isWidget ? (
-              renderWidget(item as WebOSWidgetItem)
+              renderWidget(item as WebOSWidgetItem, { onSizeChange: obsidgetSizeHandler })
             ) : (
               <>
                 {showIconLabel ? (
@@ -2459,7 +2723,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           </div>
         )}
 
-        {isEditing && isWidget && (
+        {(isEditing || altKeyHeld) && isWidget && (
           <div
             className="absolute bottom-0 right-0 p-1 cursor-se-resize z-30 opacity-60 hover:opacity-100 bg-black/50 rounded-tl-lg"
             onPointerDown={(event) => {
@@ -2487,13 +2751,15 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     if (!showSettings) return null;
     const [visibleImageCount, setVisibleImageCount] = useState(24);
     const [visibleVideoCount, setVisibleVideoCount] = useState(24);
-    const [expandedSection, setExpandedSection] = useState<string | null>(null);
+    const [showImageNames, setShowImageNames] = useState(false);
+    const [videoViewMode, setVideoViewMode] = useState<'list' | 'filmstrip'>('list');
 
-    const toggleSection = (id: string) => setExpandedSection(prev => prev === id ? null : id);
+    const expandedSection = wallpaperExpandedSection;
+    const toggleSection = (id: string) => setWallpaperExpandedSection(prev => prev === id ? null : id);
 
     return (
       <div
-        className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200"
+        className={`fixed inset-0 z-[90] flex items-center justify-center p-4 animate-in fade-in duration-200 ${settingsTab === 'wallpapers' ? 'bg-black/20' : 'bg-black/60 backdrop-blur-md'}`}
         onClick={() => setShowSettings(false)}
       >
         <div
@@ -2551,8 +2817,11 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             </div>
           </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+          {/* Content - overflow-y-scroll + touch pour que le trackpad défile correctement */}
+          <div
+            className="flex-1 overflow-y-scroll custom-scrollbar p-8"
+            style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+          >
             
             {/* Général */}
             {settingsTab === 'general' && (
@@ -2715,6 +2984,72 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                                 }`} />
                             </button>
                         </div>
+
+                        <h4 className={`text-sm uppercase tracking-wider font-bold mb-4 mt-8 ${currentTheme.textMuted}`}>Indicateurs de page</h4>
+                        <div className="space-y-4">
+                            <div className={`rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                                <div className={`font-medium mb-3 ${currentTheme.text}`}>Position</div>
+                                <div className={`text-xs mb-2 ${currentTheme.textMuted}`}>Milieu haut, centre ou milieu bas (au-dessus du dock si dock en bas, en dessous si dock en haut)</div>
+                                <div className="flex flex-wrap gap-2">
+                                    {(['top', 'center', 'bottom'] as const).map((pos) => (
+                                        <button
+                                            key={pos}
+                                            onClick={() => setConfig((prev) => ({ ...prev, pageDotsPosition: pos }))}
+                                            className={`px-3 py-2 rounded-lg border text-sm capitalize transition ${
+                                                (config.pageDotsPosition ?? 'bottom') === pos ? 'text-white' : `border-white/10 bg-black/20 hover:bg-white/5 ${currentTheme.textMuted}`
+                                            }`}
+                                            style={(config.pageDotsPosition ?? 'bottom') === pos ? { backgroundColor: currentTheme.accent, borderColor: currentTheme.accent } : {}}
+                                        >
+                                            {pos === 'top' ? 'Milieu haut' : pos === 'center' ? 'Milieu' : 'Milieu bas'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className={`rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                                <div className={`flex items-center justify-between mb-2 ${currentTheme.text}`}>
+                                    <span className="font-medium">Taille des points</span>
+                                    <span className={`text-xs bg-black/40 px-2 py-1 rounded ${currentTheme.textMuted}`}>{config.pageDotsSize ?? 12}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min={8}
+                                    max={24}
+                                    step={1}
+                                    value={config.pageDotsSize ?? 12}
+                                    onChange={(e) => setConfig((prev) => ({ ...prev, pageDotsSize: Number(e.target.value) }))}
+                                    className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-current"
+                                    style={{ color: currentTheme.accent }}
+                                />
+                            </div>
+                            <div className={`rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                                <label className={`font-medium block mb-2 ${currentTheme.text}`}>Durée d'affichage (ms)</label>
+                                <input
+                                    type="number"
+                                    min={1000}
+                                    max={30000}
+                                    step={500}
+                                    value={config.pageDotsDurationMs ?? 5000}
+                                    onChange={(e) => setConfig((prev) => ({ ...prev, pageDotsDurationMs: Math.max(1000, Math.min(30000, Number(e.target.value) || 5000)) }))}
+                                    className={`w-full max-w-[120px] bg-black/40 p-2 rounded-lg border text-sm ${currentTheme.border} ${currentTheme.text}`}
+                                />
+                                <div className={`text-xs mt-1 ${currentTheme.textMuted}`}>Temps avant que les points disparaissent (1–30 s)</div>
+                            </div>
+                            <div className={`flex items-center justify-between rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                                <div>
+                                    <div className={`font-medium ${currentTheme.text}`}>Bulle floutée</div>
+                                    <div className={`text-xs ${currentTheme.textMuted}`}>Flou derrière les points pour mieux les voir sur le fond</div>
+                                </div>
+                                <button
+                                    onClick={() => setConfig((prev) => ({ ...prev, pageDotsBlurBubble: !(prev.pageDotsBlurBubble !== false) }))}
+                                    className={`w-12 h-6 rounded-full transition-colors relative`}
+                                    style={{ backgroundColor: (config.pageDotsBlurBubble !== false) ? currentTheme.accent : 'rgba(255,255,255,0.1)' }}
+                                >
+                                    <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                                        (config.pageDotsBlurBubble !== false) ? 'translate-x-6' : 'translate-x-0'
+                                    }`} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                  </section>
                </div>
@@ -2727,13 +3062,28 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     {/* Input Custom */}
                     <div className={`p-4 rounded-xl border sticky top-0 z-10 backdrop-blur-md ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
                         <label className={`text-xs font-bold uppercase mb-2 block ${currentTheme.textMuted}`}>URL personnalisée</label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 relative">
                              <input
+                                ref={wallpaperInputFocusedRef}
                                 value={config.wallpaper}
-                                onChange={(event) => setConfig((prev) => ({ ...prev, wallpaper: event.target.value }))}
-                                className={`flex-1 bg-black/40 p-2.5 rounded-lg border text-sm outline-none transition-colors ${currentTheme.border} ${currentTheme.text}`}
+                                onChange={(event) => {
+                                  setConfig((prev) => ({ ...prev, wallpaper: event.target.value }));
+                                  setTimeout(() => wallpaperInputFocusedRef.current?.focus(), 0);
+                                }}
+                                onKeyDown={(e) => e.stopPropagation()}
+                                className={`flex-1 bg-black/40 p-2.5 rounded-lg border text-sm outline-none transition-colors pr-10 ${currentTheme.border} ${currentTheme.text}`}
                                 placeholder="https://... ou chemin local"
                             />
+                            {config.wallpaper.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setConfig((prev) => ({ ...prev, wallpaper: '' })); }}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full opacity-70 hover:opacity-100 hover:bg-white/10"
+                                aria-label="Effacer"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
                         </div>
                     </div>
 
@@ -2751,12 +3101,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                         </button>
                         
                         {expandedSection === 'presets' && (
-                            <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`}>
+                            <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`} onClick={(e) => e.stopPropagation()}>
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                     {WALLPAPERS.map((url) => (
                                         <button
                                         key={url}
-                                        onClick={() => setConfig((prev) => ({ ...prev, wallpaper: url }))}
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setConfig((prev) => ({ ...prev, wallpaper: url })); }}
                                         className={`group relative aspect-video rounded-xl overflow-hidden border-2 transition-all ${
                                             config.wallpaper === url ? '' : 'border-transparent hover:border-white/30'
                                         }`}
@@ -2776,7 +3127,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                         )}
                     </div>
 
-                    {/* Local Images - Accordéon */}
+                    {/* Local Images - Galerie pellicule */}
                     <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
                         <button 
                             onClick={() => toggleSection('images')}
@@ -2790,52 +3141,68 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                         </button>
 
                         {expandedSection === 'images' && (
-                            <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`}>
+                            <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`} onClick={(e) => e.stopPropagation()}>
                                 {vaultWallpapers.length === 0 ? (
                                     <div className={`p-4 text-center border border-dashed rounded-xl text-sm ${currentTheme.border} ${currentTheme.textMuted}`}>
                                         Aucune image trouvée dans votre coffre.
                                     </div>
                                 ) : (
                                     <>
-                                        <div 
-                                            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto custom-scrollbar pr-2"
-                                            style={{ maxHeight: '300px' }}
+                                        <div className="flex items-center justify-between gap-2 mb-3">
+                                            <label className={`flex items-center gap-2 text-xs cursor-pointer select-none ${currentTheme.textMuted}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={showImageNames}
+                                                    onChange={(e) => setShowImageNames(e.target.checked)}
+                                                    className="rounded border-white/30 bg-black/40"
+                                                />
+                                                Afficher les noms
+                                            </label>
+                                        </div>
+                                        <div
+                                            className="grid gap-3 overflow-y-auto custom-scrollbar pr-2 gpu-layer wallpaper-gallery-grid"
+                                            style={{
+                                                gridTemplateColumns: 'repeat(auto-fill, 140px)',
+                                                gridAutoRows: '140px',
+                                                maxHeight: '420px'
+                                            }}
                                         >
-                                            {vaultWallpapers.slice(0, visibleImageCount).map((path) => (
+                                            {vaultWallpapers.map((path) => (
                                                 <button
                                                     key={path}
-                                                    onClick={() => setConfig((prev) => ({ ...prev, wallpaper: path }))}
-                                                    className={`group relative aspect-video rounded-lg overflow-hidden border-2 transition-all bg-slate-900 ${
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); setConfig((prev) => ({ ...prev, wallpaper: path })); }}
+                                                    className={`relative w-full h-full min-h-[140px] rounded-xl overflow-hidden border-2 transition-all bg-slate-900 group gpu-layer ${
                                                         config.wallpaper === path ? '' : 'border-white/5 hover:border-white/30'
                                                     }`}
                                                     style={config.wallpaper === path ? { borderColor: currentTheme.accent } : {}}
                                                 >
-                                                    <img 
-                                                        src={api.resolveResourcePath(path)} 
-                                                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
-                                                        loading="lazy" 
+                                                    <img
+                                                        src={api.resolveResourcePath(path)}
+                                                        className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity gpu-layer"
+                                                        loading="lazy"
+                                                        alt=""
                                                     />
-                                                    <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/90 to-transparent">
-                                                        <div className="text-[10px] text-white truncate text-left font-mono">{path.split('/').pop()}</div>
-                                                    </div>
+                                                    {config.wallpaper === path && (
+                                                        <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: `${currentTheme.accent}30` }}>
+                                                            <div className="rounded-full p-1" style={{ backgroundColor: currentTheme.accent }}><div className="w-2 h-2 bg-white rounded-full" /></div>
+                                                        </div>
+                                                    )}
+                                                    {showImageNames && (
+                                                        <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/90 to-transparent">
+                                                            <div className="text-[10px] text-white truncate text-left font-mono">{path.split('/').pop()}</div>
+                                                        </div>
+                                                    )}
                                                 </button>
                                             ))}
                                         </div>
-                                        {visibleImageCount < vaultWallpapers.length && (
-                                            <button 
-                                                onClick={() => setVisibleImageCount(prev => prev + 24)}
-                                                className={`w-full mt-2 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition ${currentTheme.textMuted} ${currentTheme.hover}`}
-                                            >
-                                                <ChevronDown size={14} /> Voir plus d'images
-                                            </button>
-                                        )}
                                     </>
                                 )}
                             </div>
                         )}
                     </div>
 
-                    {/* Local Videos - Accordéon */}
+                    {/* Local Videos - Liste / Pellicule */}
                     <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
                         <button 
                             onClick={() => toggleSection('videos')}
@@ -2849,47 +3216,93 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                         </button>
 
                         {expandedSection === 'videos' && (
-                             <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`}>
+                             <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`} onClick={(e) => e.stopPropagation()}>
                                 {vaultVideos.length === 0 ? (
                                     <div className={`p-4 text-center border border-dashed rounded-xl text-sm ${currentTheme.border} ${currentTheme.textMuted}`}>
                                         Aucune vidéo (mp4, webm) trouvée dans votre coffre.
                                     </div>
                                 ) : (
                                     <>
-                                        <div 
-                                            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto custom-scrollbar pr-2"
-                                            style={{ maxHeight: '300px' }}
-                                        >
-                                            {vaultVideos.slice(0, visibleVideoCount).map((path) => (
-                                                <button
-                                                    key={path}
-                                                    onClick={() => setConfig((prev) => ({ ...prev, wallpaper: path }))}
-                                                    className={`group relative aspect-video rounded-lg overflow-hidden border-2 transition-all bg-black ${
-                                                        config.wallpaper === path ? '' : 'border-white/5 hover:border-white/30'
-                                                    }`}
-                                                    style={config.wallpaper === path ? { borderColor: currentTheme.accent } : {}}
-                                                >
-                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-500 group-hover:text-white transition-colors">
-                                                        <Film size={24} className="mb-2 opacity-50" />
-                                                        <div className="text-[10px] font-mono opacity-50">VIDEO</div>
-                                                    </div>
-                                                    
-                                                    <div className="absolute top-2 right-2 bg-black/60 rounded p-1">
-                                                        <Film size={12} className="text-white/70" />
-                                                    </div>
-                                                    <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/90 to-transparent">
-                                                        <div className="text-[10px] text-white truncate text-left font-mono">{path.split('/').pop()}</div>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {visibleVideoCount < vaultVideos.length && (
-                                            <button 
-                                                onClick={() => setVisibleVideoCount(prev => prev + 24)}
-                                                className={`w-full mt-2 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition ${currentTheme.textMuted} ${currentTheme.hover}`}
+                                        <div className="flex justify-end mb-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => setVideoViewMode(prev => prev === 'list' ? 'filmstrip' : 'list')}
+                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${currentTheme.border} ${currentTheme.textMuted} ${currentTheme.hover}`}
+                                                style={videoViewMode === 'filmstrip' ? { backgroundColor: currentTheme.accent, borderColor: currentTheme.accent, color: 'white' } : {}}
                                             >
-                                                <ChevronDown size={14} /> Voir plus de vidéos
+                                                <Film size={14} />
+                                                {videoViewMode === 'list' ? 'Mode pellicule' : 'Mode liste'}
                                             </button>
+                                        </div>
+                                        {videoViewMode === 'list' ? (
+                                            <div 
+                                                className="flex flex-col gap-1 overflow-y-auto custom-scrollbar pr-2"
+                                                style={{ maxHeight: '280px' }}
+                                            >
+                                                {vaultVideos.map((path) => {
+                                                    const name = path.split('/').pop() ?? path;
+                                                    const isSelected = config.wallpaper === path;
+                                                    return (
+                                                        <button
+                                                            key={path}
+                                                            type="button"
+                                                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); setConfig((prev) => ({ ...prev, wallpaper: path })); }}
+                                                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left border transition-all ${
+                                                                isSelected ? '' : `border-transparent ${currentTheme.hover}`
+                                                            }`}
+                                                            style={isSelected ? { borderColor: currentTheme.accent, backgroundColor: `${currentTheme.accent}20` } : {}}
+                                                        >
+                                                            <Film size={18} className={`flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-50'}`} />
+                                                            <span className={`text-sm font-mono truncate flex-1 ${isSelected ? 'font-semibold' : ''}`}>{name}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div 
+                                                className="flex gap-3 overflow-x-auto overflow-y-hidden pb-2 custom-scrollbar"
+                                                style={{ maxHeight: '140px', scrollSnapType: 'x mandatory' }}
+                                            >
+                                                {vaultVideos.map((path) => {
+                                                    const isSelected = config.wallpaper === path;
+                                                    const videoUrl = api.resolveResourcePath(path);
+                                                    return (
+                                                        <button
+                                                            key={path}
+                                                            type="button"
+                                                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); setConfig((prev) => ({ ...prev, wallpaper: path })); }}
+                                                            className={`relative flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all bg-black ${
+                                                                isSelected ? '' : 'border-white/5 hover:border-white/30'
+                                                            }`}
+                                                            style={{
+                                                                ...(isSelected ? { borderColor: currentTheme.accent } : {}),
+                                                                width: '200px',
+                                                                height: '112px',
+                                                                scrollSnapAlign: 'start'
+                                                            }}
+                                                        >
+                                                            <video
+                                                                src={videoUrl}
+                                                                preload="metadata"
+                                                                muted
+                                                                playsInline
+                                                                className="w-full h-full object-cover"
+                                                                onLoadedData={(e) => { (e.target as HTMLVideoElement).currentTime = 0.5; }}
+                                                            />
+                                                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
+                                                                <div className="rounded-full p-2 bg-black/50">
+                                                                    <Film size={20} className="text-white/80" />
+                                                                </div>
+                                                            </div>
+                                                            {isSelected && (
+                                                                <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: `${currentTheme.accent}30` }}>
+                                                                    <div className="rounded-full p-1" style={{ backgroundColor: currentTheme.accent }}><div className="w-2 h-2 bg-white rounded-full" /></div>
+                                                                </div>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
                                         )}
                                     </>
                                 )}
@@ -2907,34 +3320,47 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
 
   const WidgetGallery = () => {
     if (!showWidgetGallery) return null;
-    const allEntries: Array<
+    type GalleryEntry =
       | { kind: 'template'; template: WebOSWidgetTemplate }
       | { kind: 'item'; item: WebOSWidgetItem }
-    > = [
+      | { kind: 'app'; app: WebOSItem };
+    const appEntries: GalleryEntry[] = BUILT_IN_APP_TEMPLATES.map((app) => ({ kind: 'app' as const, app }));
+    const allEntries: GalleryEntry[] = [
+      ...appEntries,
       ...builtInTemplates.map((template) => ({ kind: 'template' as const, template })),
       ...osExtraItems.map((item) => ({ kind: 'item' as const, item })),
       ...obsidgetTemplates.map((template) => ({ kind: 'template' as const, template }))
     ];
 
-    const osEntries: Array<
-      | { kind: 'template'; template: WebOSWidgetTemplate }
-      | { kind: 'item'; item: WebOSWidgetItem }
-    > = [
+    const osEntries: GalleryEntry[] = [
+      ...appEntries,
       ...builtInTemplates.map((template) => ({ kind: 'template' as const, template })),
       ...osExtraItems.map((item) => ({ kind: 'item' as const, item }))
     ];
 
-    const galleryEntries =
+    const galleryEntriesBase: GalleryEntry[] =
       widgetGalleryTab === 'os'
         ? osEntries
         : widgetGalleryTab === 'obsidget'
           ? obsidgetTemplates.map((template) => ({ kind: 'template' as const, template }))
           : allEntries;
 
+    const searchLower = widgetGallerySearch.trim().toLowerCase();
+    const galleryEntries = searchLower
+      ? galleryEntriesBase.filter((entry) => {
+          const title = entry.kind === 'app' ? entry.app.title : entry.kind === 'template' ? entry.template.title : entry.item.title;
+          const id = entry.kind === 'app' ? entry.app.id : entry.kind === 'template' ? entry.template.id : entry.item.id;
+          return (
+            (title ?? '').toLowerCase().includes(searchLower) ||
+            (id ?? '').toLowerCase().includes(searchLower)
+          );
+        })
+      : galleryEntriesBase;
+
     return (
       <div
         className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-        onClick={() => setShowWidgetGallery(false)}
+        onClick={() => { setShowWidgetGallery(false); setWidgetGallerySearch(''); }}
       >
         <div
           className={`text-white w-full max-w-4xl p-6 rounded-2xl shadow-2xl border max-h-[90vh] overflow-y-auto ${currentTheme.border}`}
@@ -2943,9 +3369,39 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         >
           <div className="flex justify-between items-center mb-6">
             <h3 className={`text-2xl font-bold ${currentTheme.text}`}>Galerie de Widgets</h3>
-            <button onClick={() => setShowWidgetGallery(false)} className={`p-2 rounded-full ${currentTheme.hover} ${currentTheme.text}`}>
+            <button onClick={() => { setShowWidgetGallery(false); setWidgetGallerySearch(''); }} className={`p-2 rounded-full ${currentTheme.hover} ${currentTheme.text}`}>
               <X size={18} />
             </button>
+          </div>
+          <div className="mb-4 relative">
+            <input
+              ref={gallerySearchInputRef}
+              type="search"
+              placeholder="Rechercher un widget…"
+              value={widgetGallerySearch}
+              onChange={(e) => {
+                setWidgetGallerySearch(e.target.value);
+                setTimeout(() => gallerySearchInputRef.current?.focus(), 0);
+              }}
+              onKeyDown={(e) => e.stopPropagation()}
+              className={`w-full pl-4 pr-10 py-2.5 rounded-xl border bg-black/30 outline-none transition-colors placeholder:opacity-60 ${currentTheme.border} ${currentTheme.text}`}
+              style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+            />
+            {widgetGallerySearch.length > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setWidgetGallerySearch('');
+                  gallerySearchInputRef.current?.focus();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full opacity-70 hover:opacity-100 hover:bg-white/10 transition"
+                aria-label="Effacer la recherche"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap gap-2 mb-6">
             {['all', 'os', 'obsidget'].map(tab => {
@@ -2966,42 +3422,61 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {galleryEntries.map((entry) => {
+              const isApp = entry.kind === 'app';
               const isTemplate = entry.kind === 'template';
               const template = isTemplate ? entry.template : undefined;
-              const item = !isTemplate ? entry.item : undefined;
-              const title = template?.title ?? item?.title ?? 'Widget';
-              const cols = template?.cols ?? item?.cols ?? 1;
-              const rows = template?.rows ?? item?.rows ?? 1;
-              const bgColor = template?.bgColor ?? item?.bgColor ?? '#334155';
+              const item = entry.kind === 'item' ? entry.item : undefined;
+              const app = isApp ? entry.app : undefined;
+              const title = app?.title ?? template?.title ?? item?.title ?? 'Widget';
+              const cols = app?.cols ?? template?.cols ?? item?.cols ?? 1;
+              const rows = app?.rows ?? template?.rows ?? item?.rows ?? 1;
+              const bgColor = app?.bgColor ?? template?.bgColor ?? item?.bgColor ?? '#334155';
               const html = template?.html ?? item?.html ?? '<div class="text-xs text-white/60">Widget</div>';
+              const alreadyAdded = isApp && app && items.some((i) => i.id === app.id);
 
               return (
                 <div
-                  key={isTemplate ? `tpl-${template?.id}` : `item-${item?.id}`}
+                  key={isApp ? `app-${app?.id}` : isTemplate ? `tpl-${template?.id}` : `item-${item?.id}`}
                   className={`rounded-xl p-4 border transition ${currentTheme.border} ${currentTheme.text}`}
                   style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
                 >
                   <div className="h-32 mb-4 rounded-lg overflow-hidden relative bg-black/20 flex items-center justify-center">
-                    <div
-                      className="scale-50 origin-center w-[200%] h-[200%] flex items-center justify-center pointer-events-none"
-                      style={{ backgroundColor: bgColor === 'glass' ? 'transparent' : bgColor }}
-                      dangerouslySetInnerHTML={{ __html: html }}
-                    />
-                    {bgColor === 'glass' && <div className="absolute inset-0 bg-white/10 backdrop-blur-md -z-10" />}
+                    {isApp && app ? (
+                      <div
+                        className="w-full h-full flex items-center justify-center text-4xl font-bold rounded-lg"
+                        style={{ backgroundColor: bgColor === 'glass' ? 'rgba(255,255,255,0.1)' : bgColor, color: bgColor === '#ffffff' ? '#1e293b' : '#fff' }}
+                      >
+                        {app.icon ?? app.title?.charAt(0) ?? '?'}
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          className="scale-50 origin-center w-[200%] h-[200%] flex items-center justify-center pointer-events-none"
+                          style={{ backgroundColor: bgColor === 'glass' ? 'transparent' : bgColor }}
+                          dangerouslySetInnerHTML={{ __html: html }}
+                        />
+                        {bgColor === 'glass' && <div className="absolute inset-0 bg-white/10 backdrop-blur-md -z-10" />}
+                      </>
+                    )}
                   </div>
                   <div className="flex justify-between items-center">
                     <div>
                       <div className="font-bold">{title}</div>
                       <div className={`text-xs ${currentTheme.textMuted}`}>
-                        {cols}x{rows}
+                        {cols}x{rows} {isApp && '• App'}
                       </div>
                     </div>
                     <button
-                      onClick={() => (isTemplate && template ? addWidget(template) : item ? addWidgetFromItem(item) : null)}
-                      className="text-white px-4 py-2 rounded-lg text-sm font-bold opacity-90 hover:opacity-100"
-                      style={{ backgroundColor: currentTheme.accent }}
+                      onClick={() => {
+                        if (isApp && app && !alreadyAdded) addApp(app);
+                        else if (isTemplate && template) addWidget(template);
+                        else if (item) addWidgetFromItem(item);
+                      }}
+                      disabled={isApp && alreadyAdded}
+                      className={`px-4 py-2 rounded-lg text-sm font-bold transition ${alreadyAdded ? 'opacity-50 cursor-not-allowed bg-white/10' : 'text-white opacity-90 hover:opacity-100'}`}
+                      style={alreadyAdded ? {} : { backgroundColor: currentTheme.accent }}
                     >
-                      Ajouter
+                      {isApp && alreadyAdded ? 'Déjà ajouté' : 'Ajouter'}
                     </button>
                   </div>
                 </div>
@@ -3017,8 +3492,6 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     // ... (Unchanged logic)
     const [atlasFocus, setAtlasFocus] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
     const baseRows = 10;
-    const miniCols = 6;
-    const miniRows = 4;
     const rootCoord = getPageCoord(0);
     const relPages = pages.map((pageId) => {
       const coord = getPageCoord(pageId);
@@ -3283,62 +3756,71 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                         {isHome && <span className="text-yellow-300">HOME</span>}
                       </div>
                       <div className="flex-1 mt-2 rounded-xl bg-slate-900/50 border border-white/5 overflow-hidden">
-                        <div className="w-full h-full grid gap-1 p-2"
+                        <div className="w-full h-full grid gap-px p-2"
                           style={{
-                            gridTemplateColumns: `repeat(${miniCols}, minmax(0, 1fr))`,
-                            gridTemplateRows: `repeat(${miniRows}, minmax(0, 1fr))`
+                            gridTemplateColumns: `repeat(${gridColsDisplay}, minmax(0, 1fr))`,
+                            gridTemplateRows: `repeat(${gridMaxRows}, minmax(0, 1fr))`
                           }}
                         >
                           {itemsInPage.map((item) => {
                             if (!item.x || !item.y) return null;
-                            const miniX = Math.max(1, Math.min(miniCols, Math.round((item.x / gridCols) * miniCols)));
-                            const miniY = Math.max(1, Math.min(miniRows, Math.round((item.y / baseRows) * miniRows)));
-                            const miniW = Math.max(1, Math.min(miniCols, Math.round(((item.cols || 1) / gridCols) * miniCols)));
-                            const miniH = Math.max(1, Math.min(miniRows, Math.round(((item.rows || 1) / baseRows) * miniRows)));
-
-                            const resolvedIcon = resolveIcon(item.icon);
+                            const cols = item.cols || 1;
+                            const rows = item.rows || 1;
                             return (
                               <div
                                 key={item.id}
-                                className="rounded-[2px] overflow-hidden relative flex items-center justify-center opacity-90"
+                                className="rounded-[1px] overflow-hidden border border-white/10"
                                 style={{
-                                  gridColumnStart: miniX,
-                                  gridColumnEnd: `span ${miniW}`,
-                                  gridRowStart: miniY,
-                                  gridRowEnd: `span ${miniH}`,
+                                  gridColumnStart: item.x,
+                                  gridColumnEnd: `span ${cols}`,
+                                  gridRowStart: item.y,
+                                  gridRowEnd: `span ${rows}`,
                                   backgroundColor: item.bgColor || '#334155'
                                 }}
-                              >
-                                {item.type === 'app' && resolvedIcon ? (
-                                    <img src={resolvedIcon} className="w-4/5 h-4/5 object-contain drop-shadow-sm" />
-                                ) : item.type === 'widget' && item.html ? (
-                                    <div 
-                                        className="w-[300%] h-[300%] origin-top-left scale-[0.33] pointer-events-none"
-                                        dangerouslySetInnerHTML={{ __html: item.html }} 
-                                    />
-                                ) : (
-                                    <div className="text-[6px] text-white/80">{item.icon}</div>
-                                )}
-                              </div>
+                              />
                             );
                           })}
                         </div>
                       </div>
-                      <div className="mt-2">
+                      <div className="mt-2 relative">
                         {isPagesEditMode ? (
-                          <input
-                            value={pageName}
-                            onChange={(event) =>
-                              setConfig((prev) => ({
-                                ...prev,
-                                pageNames: { ...(prev.pageNames ?? {}), [pageId]: event.target.value }
-                              }))
-                            }
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onClick={(event) => event.stopPropagation()}
-                            placeholder={`Page ${pageId}`}
-                            className="w-full bg-slate-900/70 border border-white/10 rounded-lg px-2 py-1 text-xs"
-                          />
+                          <>
+                            <input
+                              value={pageName}
+                              onFocus={(e) => { pageRenameFocusedRef.current = e.currentTarget; }}
+                              onChange={(event) => {
+                                const el = event.target as HTMLInputElement;
+                                setConfig((prev) => ({
+                                  ...prev,
+                                  pageNames: { ...(prev.pageNames ?? {}), [pageId]: el.value }
+                                }));
+                                setTimeout(() => (pageRenameFocusedRef.current ?? el).focus(), 0);
+                              }}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => event.stopPropagation()}
+                              placeholder={`Page ${pageId}`}
+                              className="w-full bg-slate-900/70 border border-white/10 rounded-lg pl-2 pr-7 py-1 text-xs"
+                            />
+                            {pageName.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setConfig((prev) => ({
+                                    ...prev,
+                                    pageNames: { ...(prev.pageNames ?? {}), [pageId]: '' }
+                                  }));
+                                  setTimeout(() => pageRenameFocusedRef.current?.focus(), 0);
+                                }}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-60 hover:opacity-100 hover:bg-white/10"
+                                aria-label="Effacer le nom"
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                          </>
                         ) : (
                           <div className="text-xs font-semibold text-white truncate">
                             {pageName && pageName.trim() ? pageName : `Page ${pageId}`}
@@ -3400,10 +3882,26 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const pageDotCols = Math.max(1, pageDotMeta.cols);
   const pageDotRows = Math.max(1, pageDotMeta.rows);
   const dotBase = Math.max(pageDotCols, pageDotRows);
-  const dotSize = Math.max(4, Math.min(8, Math.floor(64 / dotBase)));
-  const dotGap = Math.max(3, Math.min(6, Math.floor(dotSize * 0.9)));
-  const dotGridWidth = pageDotCols * dotSize + (pageDotCols - 1) * dotGap;
-  const dotGridHeight = pageDotRows * dotSize + (pageDotRows - 1) * dotGap;
+  const PAGE_DOT_MAX_GRID = 200;
+  let dotSize = Math.max(10, Math.min(18, Math.floor(100 / dotBase)));
+  let dotGap = Math.max(4, Math.min(10, Math.floor(dotSize * 0.85)));
+  let dotGridWidth = pageDotCols * dotSize + (pageDotCols - 1) * dotGap;
+  let dotGridHeight = pageDotRows * dotSize + (pageDotRows - 1) * dotGap;
+  const maxGridDim = Math.max(dotGridWidth, dotGridHeight);
+  if (maxGridDim > PAGE_DOT_MAX_GRID) {
+    const scale = PAGE_DOT_MAX_GRID / maxGridDim;
+    dotSize = Math.max(6, Math.floor(dotSize * scale));
+    dotGap = Math.max(2, Math.floor(dotGap * scale));
+    dotGridWidth = pageDotCols * dotSize + (pageDotCols - 1) * dotGap;
+    dotGridHeight = pageDotRows * dotSize + (pageDotRows - 1) * dotGap;
+  }
+  const configDotSize = config.pageDotsSize != null ? Math.max(8, Math.min(24, config.pageDotsSize)) : null;
+  if (configDotSize != null) {
+    dotSize = configDotSize;
+    dotGap = Math.max(2, Math.floor(dotSize * 0.85));
+    dotGridWidth = pageDotCols * dotSize + (pageDotCols - 1) * dotGap;
+    dotGridHeight = pageDotRows * dotSize + (pageDotRows - 1) * dotGap;
+  }
   const swipeThreshold = Math.max(10, Math.min(120, config.swipeThreshold ?? 30));
   const swipePerpTolerance = Math.max(10, Math.round(swipeThreshold * 0.8));
   const edgePadding = 16;
@@ -3517,17 +4015,21 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             event.preventDefault();
             const diffX = event.clientX - resizeHandle.startX;
             const diffY = event.clientY - resizeHandle.startY;
-            const colDiff = Math.round(diffX / gridRowHeight);
-            const rowDiff = Math.round(diffY / gridRowHeight);
+            const rect = gridRef.current?.getBoundingClientRect();
+            const cellWidthPx = rect ? (rect.width - gridGapCol * (gridColsDisplay - 1)) / gridColsDisplay + gridGapCol : gridRowHeightDisplay + gridGapCol;
+            const cellHeightPx = gridRowHeightDisplay + gridGapRow;
+            const colDiff = Math.round(diffX / cellWidthPx);
+            const rowDiff = Math.round(diffY / cellHeightPx);
             const rawCols = Math.max(1, resizeHandle.startCols + colDiff);
             const rawRows = Math.max(1, resizeHandle.startRows + rowDiff);
             const resizedItem = items.find((item) => item.id === resizeHandle.id);
             if (resizedItem?.x && resizedItem?.y) {
-              const maxCols = Math.max(1, gridCols - resizedItem.x + 1);
+              const maxCols = Math.max(1, gridColsDisplay - resizedItem.x + 1);
               const newCols = Math.min(rawCols, maxCols);
               const newRows = rawRows;
               const overlaps = items.some((item) => {
                 if (item.id === resizeHandle.id) return false;
+                if (config.viewMode === 'desktop' && item.type === 'app') return false;
                 if ((item.pageIndex ?? 0) !== (resizedItem.pageIndex ?? 0)) return false;
                 if (!item.x || !item.y) return false;
                 const w = item.cols || 1;
@@ -3552,7 +4054,10 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           setDragPos({ x: event.clientX, y: event.clientY });
       
           if (!isPageNavBlocked) {
-            const edgeThreshold = 48;
+            const edgeThreshold = 24;
+            const stableMs = 350;
+            const stillThresholdPx = 10;
+            const flipDelayMs = 1000;
             const containerRect = gridRef.current?.getBoundingClientRect();
             const rightEdge = containerRect ? containerRect.right : window.innerWidth;
             const leftEdge = containerRect ? containerRect.left : 0;
@@ -3566,23 +4071,69 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               pageFlipDir.current = { x: dx, y: dy };
               pageFlipTimer.current = window.setTimeout(() => {
                 movePageBy(dx, dy);
-              }, 700);
+              }, flipDelayMs);
             };
       
             const clearFlip = () => {
+              if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+              pageFlipStableTimer.current = null;
+              pageFlipStablePos.current = null;
               if (pageFlipTimer.current) window.clearTimeout(pageFlipTimer.current);
               pageFlipTimer.current = null;
               pageFlipDir.current = null;
             };
       
-            if (event.clientX > rightEdge - edgeThreshold) {
-              scheduleFlip(1, 0);
-            } else if (event.clientX < leftEdge + edgeThreshold) {
-              scheduleFlip(-1, 0);
-            } else if (event.clientY > bottomEdge - edgeThreshold) {
-              scheduleFlip(0, 1);
-            } else if (event.clientY < topEdge + edgeThreshold) {
-              scheduleFlip(0, -1);
+            const px = event.clientX;
+            const py = event.clientY;
+            const inRight = px > rightEdge - edgeThreshold;
+            const inLeft = px < leftEdge + edgeThreshold;
+            const inBottom = py > bottomEdge - edgeThreshold;
+            const inTop = py < topEdge + edgeThreshold;
+      
+            if (inRight) {
+              const last = pageFlipStablePos.current;
+              const still = !last || (Math.abs(px - last.x) <= stillThresholdPx && Math.abs(py - last.y) <= stillThresholdPx);
+              if (!still) {
+                if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+                pageFlipStableTimer.current = null;
+                pageFlipStablePos.current = { x: px, y: py };
+              } else if (!pageFlipStableTimer.current) {
+                pageFlipStablePos.current = { x: px, y: py };
+                pageFlipStableTimer.current = window.setTimeout(() => scheduleFlip(1, 0), stableMs);
+              }
+            } else if (inLeft) {
+              const last = pageFlipStablePos.current;
+              const still = !last || (Math.abs(px - last.x) <= stillThresholdPx && Math.abs(py - last.y) <= stillThresholdPx);
+              if (!still) {
+                if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+                pageFlipStableTimer.current = null;
+                pageFlipStablePos.current = { x: px, y: py };
+              } else if (!pageFlipStableTimer.current) {
+                pageFlipStablePos.current = { x: px, y: py };
+                pageFlipStableTimer.current = window.setTimeout(() => scheduleFlip(-1, 0), stableMs);
+              }
+            } else if (inBottom) {
+              const last = pageFlipStablePos.current;
+              const still = !last || (Math.abs(px - last.x) <= stillThresholdPx && Math.abs(py - last.y) <= stillThresholdPx);
+              if (!still) {
+                if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+                pageFlipStableTimer.current = null;
+                pageFlipStablePos.current = { x: px, y: py };
+              } else if (!pageFlipStableTimer.current) {
+                pageFlipStablePos.current = { x: px, y: py };
+                pageFlipStableTimer.current = window.setTimeout(() => scheduleFlip(0, 1), stableMs);
+              }
+            } else if (inTop) {
+              const last = pageFlipStablePos.current;
+              const still = !last || (Math.abs(px - last.x) <= stillThresholdPx && Math.abs(py - last.y) <= stillThresholdPx);
+              if (!still) {
+                if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
+                pageFlipStableTimer.current = null;
+                pageFlipStablePos.current = { x: px, y: py };
+              } else if (!pageFlipStableTimer.current) {
+                pageFlipStablePos.current = { x: px, y: py };
+                pageFlipStableTimer.current = window.setTimeout(() => scheduleFlip(0, -1), stableMs);
+              }
             } else {
               clearFlip();
             }
@@ -3606,6 +4157,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             const draggedY = dragItemRef.current.y ?? layoutOverrides.get(dragItemRef.current.id)?.y;
             const overlapTarget = items.find((item) => {
               if (item.id === draggingId) return false;
+              if (config.viewMode === 'desktop' && item.type === 'app') return false;
               if ((item.pageIndex ?? 0) !== currentPageId) return false;
               const ix = item.x ?? layoutOverrides.get(item.id)?.x;
               const iy = item.y ?? layoutOverrides.get(item.id)?.y;
@@ -3668,6 +4220,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         }
 
         if (longPressTimer.current) { window.clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+        if (pageFlipStableTimer.current) { window.clearTimeout(pageFlipStableTimer.current); pageFlipStableTimer.current = null; pageFlipStablePos.current = null; }
         if (pageFlipTimer.current) { window.clearTimeout(pageFlipTimer.current); pageFlipTimer.current = null; pageFlipDir.current = null; }
         
         if (backgroundDragActiveRef.current && backgroundDragRef.current && !isEditing && !draggingId) {
@@ -3700,6 +4253,12 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         modifierDragRef.current = false;
         
         if (draggingId && dragItemRef.current) {
+              hasJustDraggedRef.current = true;
+              const dockRect = dockContainerRef.current?.getBoundingClientRect();
+              const isOverDock = !!dockRect && event.clientX >= dockRect.left && event.clientX <= dockRect.right && event.clientY >= dockRect.top && event.clientY <= dockRect.bottom;
+              if (isOverDock && dragItemRef.current.type === 'widget') {
+                addWidgetToDock(dragItemRef.current as WebOSWidgetItem);
+              } else if (!isOverDock) {
               const trashRect = trashRef.current?.getBoundingClientRect();
               const isOverTrash = !!trashRect && event.clientX >= trashRect.left && event.clientX <= trashRect.right && event.clientY >= trashRect.top && event.clientY <= trashRect.bottom;
               if (isOverTrash) { deleteItem(draggingId); } 
@@ -3710,7 +4269,14 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                       const itemX = event.clientX - dragOffset.x;
                       const itemY = event.clientY - dragOffset.y;
                       const { x, y } = pixelsToGrid(itemX, itemY, rect);
-                      const colliding = items.find((item) => item.id !== draggingId && (item.pageIndex ?? 0) === currentPageId && item.x === x && item.y === y);
+                      const colliding = items.find(
+                        (item) =>
+                          item.id !== draggingId &&
+                          (item.pageIndex ?? 0) === currentPageId &&
+                          item.x === x &&
+                          item.y === y &&
+                          !(config.viewMode === 'desktop' && item.type === 'app')
+                      );
                       if (colliding) {
                           const draggedItem = items.find((item) => item.id === draggingId);
                           if (draggedItem) {
@@ -3721,6 +4287,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                           updateItem(draggingId, { x, y, pageIndex: currentPageId });
                       }
                   }
+              }
               }
         }
         setDraggingId(null);
@@ -3770,13 +4337,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           right: 0
         }}
       >
-        {isEditing && (
+        {(isEditing || altKeyHeld) && (
           <div
             className="absolute inset-0 pointer-events-none opacity-20"
             style={{
               backgroundImage:
                 'linear-gradient(to right, rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.25) 1px, transparent 1px)',
-              backgroundSize: `calc((100% - ${gridCols - 1} * 16px) / ${gridCols} + 16px) calc(${gridRowHeight}px + 24px)`
+              backgroundSize: `calc((100% - ${gridColsDisplay - 1} * ${gridGapCol}px) / ${gridColsDisplay} + ${gridGapCol}px) calc(${gridRowHeightDisplay}px + ${gridGapRow}px)`
             }}
           />
         )}
@@ -3787,7 +4354,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             transition:
               isPageDragging && pageSnapOffset.x === 0 && pageSnapOffset.y === 0
                 ? 'none'
-                : 'transform 0.65s cubic-bezier(0.22, 1, 0.36, 1)'
+                : 'transform 0.85s cubic-bezier(0.33, 1, 0.68, 1)'
           }}
         >
           {pages.map((pageIdx) => {
@@ -3796,14 +4363,21 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               <div
                 key={pageIdx}
                 className="absolute inset-0"
-                style={{ transform: `translate3d(${coord.x * 100}%, ${coord.y * 100}%, 0)` }}
+                style={{
+                  transform: `translate3d(${coord.x * 100}%, ${coord.y * 100}%, 0)`,
+                  paddingLeft: `calc((100% - ${(gridColsDisplay - 1) * gridGapCol}px) / ${gridColsDisplay} + ${gridGapCol}px)`,
+                  paddingRight: `calc((100% - ${(gridColsDisplay - 1) * gridGapCol}px) / ${gridColsDisplay} + ${gridGapCol}px)`,
+                  paddingTop: `${gridRowHeightDisplay + gridGapRow}px`,
+                  paddingBottom: `${gridRowHeightDisplay + gridGapRow}px`
+                }}
               >
                 <div
                   ref={pageIdx === currentPageId ? gridRef : null}
-                  className="grid gap-x-4 gap-y-6 max-w-7xl mx-auto"
+                  className="grid w-full h-full"
                   style={{
-                    gridAutoRows: `${gridRowHeight}px`,
-                    gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`
+                    gridAutoRows: `${gridRowHeightDisplay}px`,
+                    gridTemplateColumns: `repeat(${gridColsDisplay}, minmax(0, 1fr))`,
+                    gap: `${gridGapRow}px ${gridGapCol}px`
                   }}
                 >
                   {items
@@ -3818,21 +4392,46 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     )
                     .map((item) => renderItem(item))}
 
-                  {dragPlaceholder && pageIdx === currentPageId && (
+                  {dragPlaceholder && pageIdx === currentPageId && dragItemRef.current && (
                     <div
-                      className="rounded-2xl bg-white/20 border-2 border-white/50 border-dashed transition-all duration-100"
+                      className="rounded-2xl overflow-hidden transition-all duration-100 pointer-events-none"
                       style={{
                         gridColumnStart: dragPlaceholder.x,
                         gridColumnEnd: `span ${dragPlaceholder.w}`,
                         gridRowStart: dragPlaceholder.y,
                         gridRowEnd: `span ${dragPlaceholder.h}`,
-                        zIndex: 0
+                        zIndex: 0,
+                        opacity: 0.5
                       }}
-                    />
+                    >
+                      {dragItemRef.current.type === 'widget' ? (
+                        <div className="w-full h-full rounded-2xl overflow-hidden">
+                          {renderWidget(dragItemRef.current as WebOSWidgetItem, { isEditingOverride: true })}
+                        </div>
+                      ) : (
+                        <div
+                          className="w-full h-full flex flex-col items-center justify-center rounded-2xl text-white"
+                          style={{ backgroundColor: dragItemRef.current.bgColor || '#334155' }}
+                        >
+                          {resolveIcon(dragItemRef.current.icon) ? (
+                            <img
+                              src={resolveIcon(dragItemRef.current.icon)!}
+                              alt=""
+                              className="w-2/3 h-2/3 object-contain"
+                            />
+                          ) : (
+                            <span className="text-4xl filter drop-shadow-md">{dragItemRef.current.icon}</span>
+                          )}
+                          {(dragItemRef.current.rows || 1) > 1 && (
+                            <span className="text-xs font-bold px-2 text-center mt-1">{dragItemRef.current.title}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
 
-                  {isEditing && pageIdx === currentPageId && (
-                    <div className="flex gap-2" style={{ height: gridRowHeight }} />
+                  {(isEditing || altKeyHeld) && pageIdx === currentPageId && (
+                    <div className="flex gap-2" style={{ height: gridRowHeightDisplay + gridGapRow }} />
                   )}
                 </div>
               </div>
@@ -3841,13 +4440,30 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         </div>
       </div>
 
-      {config.viewMode === 'desktop' && dockItems.length > 0 && (
+      {config.viewMode === 'desktop' && (dockItems.length > 0 || isEditing || altKeyHeld) && (
         <div
+          ref={dockContainerRef}
           className={`absolute left-1/2 -translate-x-1/2 max-w-[95%] w-auto z-40 ${
             config.barPosition === 'bottom' ? 'bottom-16' : 'bottom-4'
           }`}
         >
-          <Dock items={dockItems} openItemIds={openDockIds} themeClass={currentTheme.dock} onLaunch={launchItem} resolveIcon={resolveIcon} />
+          {dockItems.length > 0 ? (
+            <Dock
+              items={dockItems}
+              openItemIds={openDockIds}
+              themeClass={currentTheme.dock}
+              onLaunch={launchItem}
+              resolveIcon={resolveIcon}
+              isEditMode={isEditing || altKeyHeld}
+              onEnterEditMode={() => setIsEditing(true)}
+              onRemoveFromDock={(item) => deleteItem(item.id)}
+              onRenameItem={(item, newTitle) => updateItem(item.id, { title: newTitle })}
+            />
+          ) : (isEditing || altKeyHeld) ? (
+            <div className="backdrop-blur-xl border border-white/20 border-dashed px-6 py-4 rounded-3xl text-white/60 text-sm text-center">
+              Glissez un widget ici pour en faire une icône d’app
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -3864,19 +4480,41 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           onUpdate={updateWindow}
           barColor={currentTheme.barColor}
           widgetTransparent={config.fullscreenWidgetTransparent}
+          onPinToDock={handlePinToDock}
         >
           {renderWindowContent(win)}
         </WindowFrame>
       ))}
 
       <div
-        className={`absolute left-0 right-0 flex justify-center pointer-events-none z-30 transition-opacity duration-300 ${
+        className={`absolute left-0 right-0 flex justify-center pointer-events-none z-[100] transition-opacity duration-300 ${
           showPageDots ? 'opacity-100' : 'opacity-0'
         }`}
-        style={config.barPosition === 'bottom' ? { top: topInset } : { bottom: bottomInset }}
+        style={(() => {
+          const pos = config.pageDotsPosition ?? 'bottom';
+          const barPos = config.barPosition;
+          const base = { maxWidth: 'min(100vw, 100%)', padding: '0 12px', boxSizing: 'content-box' as const };
+          if (pos === 'center') return { ...base, top: '50%', transform: 'translateY(-50%)' };
+          if (pos === 'top') return { ...base, top: barPos === 'top' ? topInset : edgePadding };
+          const dockOffset = config.viewMode === 'desktop' && dockItems.length > 0 ? 80 : 0;
+          return { ...base, bottom: barPos === 'bottom' ? bottomInset + dockOffset : edgePadding };
+        })()}
       >
+        {config.pageDotsBlurBubble !== false && (
+          <div className="absolute inset-0 flex justify-center items-center pointer-events-none">
+            <div
+              className="rounded-2xl backdrop-blur-md bg-white/5 shrink-0"
+              style={{
+                width: dotGridWidth + 24,
+                height: dotGridHeight + 20,
+                minWidth: dotGridWidth + 24,
+                minHeight: dotGridHeight + 20
+              }}
+            />
+          </div>
+        )}
         <div
-          className="grid"
+          className={`grid shrink-0 relative z-[1] ${dotsExiting ? 'page-dots-spiral-exit' : ''}`}
           style={{
             gridTemplateColumns: `repeat(${pageDotCols}, ${dotSize}px)`,
             gridTemplateRows: `repeat(${pageDotRows}, ${dotSize}px)`,
@@ -3963,27 +4601,35 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         }}
         onOpenPages={() => setShowPages(true)}
         currentPageLabel={currentPageLabel}
-        showTrash={isEditing}
+        showTrash={isEditing || altKeyHeld}
         trashRef={trashRef}
       />
 
       <SettingsModal />
       <WidgetGallery />
-      <PagesModal />
-
-      {draggingId && dragItemRef.current && (
-        <div
-          className="fixed z-[100] pointer-events-none opacity-80 shadow-2xl rounded-2xl overflow-hidden scale-110"
-          style={{ left: dragPos.x - dragOffset.x, top: dragPos.y - dragOffset.y, width: 80, height: 80 }}
-        >
-          <div
-            className="w-full h-full flex items-center justify-center text-4xl text-white"
-            style={{ backgroundColor: dragItemRef.current.bgColor || '#334155' }}
-          >
-            {dragItemRef.current.icon}
-          </div>
-        </div>
+      {showPages && (
+        <PagesModalStable
+          config={config}
+          setConfig={setConfig}
+          currentPageId={currentPageId}
+          setCurrentPageId={setCurrentPageId}
+          setShowPages={setShowPages}
+          setIsPagesEditMode={setIsPagesEditMode}
+          items={items}
+          isPagesEditMode={isPagesEditMode}
+          pages={pages}
+          getPageCoord={getPageCoord}
+          currentTheme={currentTheme}
+          pageDragIdRef={pageDragIdRef}
+          pageRenameFocusedRef={pageRenameFocusedRef}
+          resolveIcon={resolveIcon}
+          gridColsDisplay={gridColsDisplay}
+          gridMaxRows={gridMaxRows}
+          gridGapCol={gridGapCol}
+          gridRowHeightDisplay={gridRowHeightDisplay}
+        />
       )}
+
     </div>
   );
 };

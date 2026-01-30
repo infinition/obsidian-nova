@@ -1452,6 +1452,30 @@
   border-radius: 2px;
 }
 
+/* Barre de défilement visible et défilement trackpad dans la modale paramètres */
+.webos-root .custom-scrollbar {
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.webos-root .custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.webos-root .custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.webos-root .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+}
+
+.webos-root .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+
 @keyframes webos-jiggle {
   0% { transform: rotate(-0.3deg); }
   50% { transform: rotate(0.3deg); }
@@ -1467,31 +1491,107 @@
   will-change: transform;
 }
 
+/* Fenêtre widget plein écran : couche GPU dédiée pour de meilleures perfs */
+.webos-root .widget-fullscreen-gpu {
+  contain: paint;
+  backface-visibility: hidden;
+  isolation: isolate;
+}
+
+.webos-root .widget-fullscreen-gpu-content {
+  transform: translateZ(0);
+  contain: paint;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Galerie fonds d'écran : accélération GPU pour un scroll fluide */
+.webos-root .wallpaper-gallery-grid {
+  contain: paint;
+  backface-visibility: hidden;
+}
+
 .webos-root .webos-finder {
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  -webkit-overflow-scrolling: touch;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.webos-root .webos-finder .webos-finder-scroll {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 .webos-root .webos-finder-sidebar {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(2, 6, 23, 0.85) 100%);
+  background: linear-gradient(165deg, rgba(20, 28, 42, 0.98) 0%, rgba(12, 18, 28, 0.96) 100%);
+  box-shadow: 2px 0 24px rgba(0, 0, 0, 0.2);
+}
+
+.webos-root .webos-finder-tree-item {
+  margin-bottom: 2px;
+}
+
+.webos-root .webos-finder-tree-item .webos-finder-tree-item {
+  margin-bottom: 2px;
 }
 
 .webos-root .webos-finder-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+  scrollbar-color: rgba(148, 163, 184, 0.5) rgba(255, 255, 255, 0.04);
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .webos-root .webos-finder-scroll::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
 }
 
 .webos-root .webos-finder-scroll::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
 }
 
 .webos-root .webos-finder-scroll::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
-  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.webos-root .webos-finder-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+  background-clip: padding-box;
+}
+
+.webos-root .webos-finder-path-pill {
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.webos-root .webos-finder-path-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.webos-root .webos-finder-grid-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.webos-root .webos-finder-grid-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
+}
+
+.webos-root .webos-finder-list-row {
+  transition: background 0.15s ease;
 }
 
 .webos-hide-header .view-header {
@@ -1502,20 +1602,17 @@
   padding-top: 0;
 }
 
-.webos-root .webos-finder-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.6);
-}
-
 .webos-root .widget-fullscreen-hotspot {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 0;
+  left: 100%;
   width: 40px;
-  height: 40px;
+  height: 36px;
+  margin-left: -2px;
   z-index: 30;
   display: flex;
   align-items: flex-start;
-  justify-content: flex-end;
+  justify-content: flex-start;
   pointer-events: auto;
 }
 
@@ -1533,6 +1630,19 @@
 
 .webos-root .widget-fullscreen-hotspot:hover {
   pointer-events: auto;
+}
+
+/* Animation spirale des indicateurs de page avant disparition */
+.webos-root .page-dots-spiral-exit {
+  animation: page-dots-spiral 1s ease-in forwards;
+  transform-origin: center center;
+}
+
+@keyframes page-dots-spiral {
+  to {
+    transform: scale(0) rotate(180deg);
+    opacity: 0;
+  }
 }
 
 .webos-root .placeholder\:text-white\/30::-moz-placeholder {

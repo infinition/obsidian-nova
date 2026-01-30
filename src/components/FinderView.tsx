@@ -11,13 +11,15 @@ import {
   FileText,
   FileVideo,
   Folder,
+  FolderOpen,
   Image,
   LayoutGrid,
   List,
   MoreHorizontal,
   RefreshCcw,
   Search,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 import type { VaultEntry, WebOSAPI } from '../types';
 
@@ -31,19 +33,21 @@ type ViewMode = 'grid' | 'list';
 const isImage = (entry: VaultEntry) =>
   entry.type === 'file' && ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif', 'bmp'].includes(entry.extension || '');
 
-const getFileIcon = (entry: VaultEntry) => {
+const getFileIcon = (entry: VaultEntry, size = 20) => {
   const ext = (entry.extension || '').toLowerCase();
-  if (isImage(entry)) return <Image size={20} />;
-  if (['md', 'markdown', 'txt', 'rtf'].includes(ext)) return <FileText size={20} />;
-  if (['csv', 'tsv', 'xlsx', 'xls'].includes(ext)) return <FileSpreadsheet size={20} />;
-  if (['json', 'yaml', 'yml'].includes(ext)) return <FileJson size={20} />;
+  const iconClass = 'shrink-0 text-slate-300';
+  if (entry.type === 'folder') return <Folder size={size} className="shrink-0 text-amber-400/90" />;
+  if (isImage(entry)) return <Image size={size} className={`${iconClass} text-amber-400/90`} />;
+  if (['md', 'markdown', 'txt', 'rtf'].includes(ext)) return <FileText size={size} className={`${iconClass} text-blue-400/90`} />;
+  if (['csv', 'tsv', 'xlsx', 'xls'].includes(ext)) return <FileSpreadsheet size={size} className={`${iconClass} text-emerald-500/90`} />;
+  if (['json', 'yaml', 'yml'].includes(ext)) return <FileJson size={size} className={`${iconClass} text-yellow-400/90`} />;
   if (['js', 'jsx', 'ts', 'tsx', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'php', 'rb'].includes(ext)) {
-    return <FileCode size={20} />;
+    return <FileCode size={size} className={`${iconClass} text-orange-400/90`} />;
   }
-  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return <FileArchive size={20} />;
-  if (['mp3', 'wav', 'flac', 'ogg', 'm4a'].includes(ext)) return <FileAudio size={20} />;
-  if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return <FileVideo size={20} />;
-  return <File size={20} />;
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return <FileArchive size={size} className={`${iconClass} text-amber-600/90`} />;
+  if (['mp3', 'wav', 'flac', 'ogg', 'm4a'].includes(ext)) return <FileAudio size={size} className={`${iconClass} text-violet-400/90`} />;
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return <FileVideo size={size} className={`${iconClass} text-rose-400/90`} />;
+  return <File size={size} className={iconClass} />;
 };
 
 const buildMap = (entries: VaultEntry[], map: Map<string, VaultEntry>) => {
@@ -243,12 +247,16 @@ export const FinderView: React.FC<FinderViewProps> = ({ api, onOpenImage }) => {
       if (entry.type !== 'folder') return null;
       const isOpen = expanded.has(entry.path);
       const isActive = currentFolder === entry.path;
+      const indent = depth * 14;
       return (
-        <div key={entry.path} className="space-y-1">
+        <div key={entry.path} className="webos-finder-tree-item">
           <button
-            className={`w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg transition ${
-              isActive ? 'bg-white/15 text-white' : 'hover:bg-white/10 text-white/80'
+            className={`w-full flex items-center gap-2.5 text-left rounded-lg transition-all duration-150 text-sm border border-transparent ${
+              isActive
+                ? 'bg-cyan-500/20 text-white border-cyan-400/30 shadow-sm'
+                : 'hover:bg-white/[0.08] text-white/90 hover:border-white/10'
             }`}
+            style={{ paddingLeft: 10 + indent, paddingRight: 10, paddingTop: 6, paddingBottom: 6 }}
             onClick={() => {
               setCurrentFolder(entry.path);
               toggleFolder(entry.path);
@@ -262,218 +270,352 @@ export const FinderView: React.FC<FinderViewProps> = ({ api, onOpenImage }) => {
               await loadTree();
             }}
           >
-            <ChevronRight size={14} className={`transition ${isOpen ? 'rotate-90' : ''}`} />
-            <Folder size={16} />
-            <span className="truncate">{entry.name}</span>
+            <ChevronRight
+              size={14}
+              className={`shrink-0 transition-transform duration-150 text-white/50 ${isOpen ? 'rotate-90' : ''}`}
+            />
+            {isOpen ? (
+              <FolderOpen size={16} className="shrink-0 text-amber-400/90" />
+            ) : (
+              <Folder size={16} className="shrink-0 text-amber-400/80" />
+            )}
+            <span className="truncate flex-1 min-w-0 font-medium">{entry.name}</span>
           </button>
           {isOpen && entry.children && (
-            <div className="pl-4">{renderTree(entry.children, depth + 1)}</div>
+            <div className="relative" style={{ marginLeft: indent + 20 }}>
+              <div
+                className="absolute left-0 top-0 bottom-0 w-px bg-white/10 rounded-full"
+                style={{ left: 6 }}
+                aria-hidden
+              />
+              {renderTree(entry.children, depth + 1)}
+            </div>
           )}
         </div>
       );
     });
 
+  const goToParentFolder = () => {
+    if (!currentFolder) return;
+    const parts = currentFolder.split('/').filter(Boolean);
+    parts.pop();
+    setCurrentFolder(parts.join('/'));
+  };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        goToParentFolder();
+      }
+      if (e.key === 'Enter' && selectedPath) {
+        const entry = treeMap.get(selectedPath);
+        if (entry) openEntry(entry);
+      }
+    };
+    el.addEventListener('keydown', onKeyDown);
+    return () => el.removeEventListener('keydown', onKeyDown);
+  }, [selectedPath, currentFolder, treeMap]);
+
   return (
     <div
       ref={containerRef}
-      className="webos-finder w-full h-full flex text-white bg-slate-950/70"
+      className="webos-finder w-full h-full flex flex-col text-white min-h-0 overflow-hidden"
+      style={{ touchAction: 'pan-y', minHeight: 0 }}
       onMouseMove={(event) => {
         lastPointerRef.current = { x: event.clientX, y: event.clientY };
       }}
     >
-      <div className="webos-finder-sidebar w-72 border-r border-white/10 bg-slate-900/70 flex flex-col">
-        <div className="px-4 py-4 border-b border-white/10">
-          <div className="font-bold text-sm uppercase tracking-wide text-white/60">Navigator</div>
-          <div className="text-xs text-white/40">{totalFiles} fichiers</div>
+      {/* Sidebar */}
+      <aside className="webos-finder-sidebar w-[260px] shrink-0 border-r border-white/10 flex flex-col min-h-0 overflow-hidden">
+        <div className="px-4 py-5 shrink-0 border-b border-white/10">
+          <h2 className="text-[11px] font-bold uppercase tracking-widest text-cyan-400/90">Navigateur</h2>
+          <p className="text-xs text-white/50 mt-1">{totalFiles} éléments</p>
         </div>
-        <div className="px-4 py-3 border-b border-white/10">
+        <div className="px-3 py-3 shrink-0 border-b border-white/10">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Rechercher..."
-              className="w-full bg-slate-800/80 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-blue-500"
+              onChange={(event) => {
+                const el = event.target as HTMLInputElement;
+                setQuery(el.value);
+                setTimeout(() => el.focus(), 0);
+              }}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Rechercher dans le vault…"
+              className="w-full bg-white/[0.06] border border-white/10 rounded-full pl-9 pr-9 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400/40 transition-all"
             />
+            {query.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full opacity-70 hover:opacity-100 hover:bg-white/10 text-white/80 transition"
+                aria-label="Effacer"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 webos-finder-scroll">
-          <button
-            className={`w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg transition ${
-              currentFolder === '' ? 'bg-white/15 text-white' : 'hover:bg-white/10 text-white/80'
-            }`}
-            onClick={() => setCurrentFolder('')}
-          >
-            <Folder size={16} />
-            <span>Workspace</span>
-          </button>
-          {renderTree(tree)}
-        </div>
-      </div>
+        <nav className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="px-2 pt-3 pb-1 shrink-0">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 px-2">Favoris</span>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2 webos-finder-scroll">
+            <button
+              className={`w-full flex items-center gap-3 text-left px-3 py-2.5 rounded-xl transition-all duration-200 text-sm ${
+                currentFolder === '' ? 'bg-cyan-500/25 text-white shadow-lg shadow-cyan-500/10' : 'hover:bg-white/10 text-white/90'
+              }`}
+              onClick={() => setCurrentFolder('')}
+            >
+              <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+                <Folder size={18} className="text-amber-400" />
+              </div>
+              <span className="truncate font-medium">Workspace</span>
+            </button>
+            <div className="pt-4 pb-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 px-2">Dossiers</span>
+            </div>
+            {renderTree(tree)}
+          </div>
+        </nav>
+      </aside>
 
-      <div className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-slate-900/50">
-          <div>
-            <div className="text-lg font-bold">Explorer</div>
-            <div className="text-xs text-white/50">
-              {currentFolder ? currentFolder : 'Workspace'}
+      {/* Main */}
+      <main className="flex-1 flex flex-col min-h-0 min-w-0">
+        <header className="shrink-0 border-b border-white/10 bg-black/20">
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="flex items-center gap-1 flex-wrap webos-finder-path-pill">
+                <button
+                  type="button"
+                  onClick={() => setCurrentFolder('')}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-white/80 webos-finder-path-pill"
+                  title="Workspace"
+                >
+                  Workspace
+                </button>
+                {breadcrumbs.map((crumb) => (
+                  <React.Fragment key={crumb.path}>
+                    <span className="text-white/30 px-0.5">/</span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentFolder(crumb.path)}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium text-white/70 truncate max-w-[140px] webos-finder-path-pill"
+                      title={crumb.path}
+                    >
+                      {crumb.name}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-cyan-500/25 text-cyan-300' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
+                onClick={() => setViewMode('grid')}
+                title="Vue grille"
+              >
+                <LayoutGrid size={18} />
+              </button>
+              <button
+                className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-cyan-500/25 text-cyan-300' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
+                onClick={() => setViewMode('list')}
+                title="Vue liste"
+              >
+                <List size={18} />
+              </button>
+              <button
+                className="p-2.5 rounded-xl hover:bg-white/10 text-white/60 hover:text-white transition-all active:scale-95"
+                onClick={loadTree}
+                title="Rafraîchir (F5)"
+              >
+                <RefreshCcw size={18} />
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-white/10' : 'hover:bg-white/10'}`}
-              onClick={() => setViewMode('grid')}
-              title="Galerie"
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-white/10' : 'hover:bg-white/10'}`}
-              onClick={() => setViewMode('list')}
-              title="Liste"
-            >
-              <List size={16} />
-            </button>
-            <button className="p-2 rounded-lg hover:bg-white/10" onClick={loadTree} title="Rafraichir">
-              <RefreshCcw size={16} />
-            </button>
-          </div>
-        </div>
+        </header>
 
-        <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2 text-xs text-white/60">
-          <button className="hover:text-white" onClick={() => setCurrentFolder('')}>
-            Workspace
-          </button>
-          {breadcrumbs.map((crumb) => (
-            <React.Fragment key={crumb.path}>
-              <span>/</span>
-              <button className="hover:text-white" onClick={() => setCurrentFolder(crumb.path)}>
-                {crumb.name}
-              </button>
-            </React.Fragment>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 webos-finder-scroll">
-          {currentChildren.length === 0 && (
-            <div className="text-white/40 text-sm">Aucun fichier trouvé.</div>
-          )}
-
-          {viewMode === 'grid' ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden webos-finder-scroll" style={{ minHeight: 0 }}>
+          {currentChildren.length === 0 ? (
+            <div className="flex flex-col items-center justify-center min-h-[280px] px-6 text-center">
+              <div className="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+                <Folder size={36} className="text-white/20" />
+              </div>
+              <p className="text-white/60 font-medium">Ce dossier est vide</p>
+              {query.trim() && (
+                <p className="text-white/40 text-sm mt-1">Aucun résultat pour « {query} »</p>
+              )}
+            </div>
+          ) : viewMode === 'grid' ? (
+            <div className="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
               {currentChildren.map((entry) => (
                 <div
                   key={entry.path}
-                  className={`p-4 rounded-xl border border-white/10 bg-slate-900/40 hover:bg-white/5 transition cursor-pointer ${
-                    selectedPath === entry.path ? 'ring-2 ring-blue-500/70' : ''
+                  className={`webos-finder-grid-card flex flex-col items-center p-6 rounded-2xl border cursor-pointer group select-none ${
+                    selectedPath === entry.path
+                      ? 'border-cyan-400/50 bg-cyan-500/15 ring-2 ring-cyan-400/30'
+                      : 'border-white/10 bg-white/[0.04] hover:border-white/20'
                   }`}
                   draggable={entry.type === 'file'}
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData('text/plain', entry.path);
-                  }}
-                  onContextMenu={(event) => handleContextMenu(event, entry)}
+                  onDragStart={(e) => e.dataTransfer.setData('text/plain', entry.path)}
+                  onContextMenu={(e) => handleContextMenu(e, entry)}
                   onMouseEnter={() => schedulePreview(entry)}
                   onMouseLeave={clearPreview}
-                  onClick={() => {
-                    setSelectedPath(entry.path);
+                  onDoubleClick={() => {
                     if (entry.type === 'file') openEntry(entry);
                     else setCurrentFolder(entry.path);
                   }}
+                  onClick={() => {
+                    setSelectedPath(entry.path);
+                    if (entry.type === 'folder') setCurrentFolder(entry.path);
+                  }}
                 >
-                  <div className="flex items-center gap-2 mb-3">
-                    {entry.type === 'folder' ? <Folder size={20} /> : getFileIcon(entry)}
-                    <span className="font-medium text-sm truncate">{entry.name}</span>
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-3 transition-colors ${
+                    selectedPath === entry.path ? 'bg-cyan-500/20' : 'bg-white/5 group-hover:bg-white/10'
+                  }`}>
+                    {entry.type === 'folder' ? (
+                      expanded.has(entry.path) ? (
+                        <FolderOpen size={32} className="text-amber-400" />
+                      ) : (
+                        <Folder size={32} className="text-amber-400" />
+                      )
+                    ) : (
+                      getFileIcon(entry, 32)
+                    )}
                   </div>
-                  <div className="text-xs text-white/40">{entry.path}</div>
+                  <span className="font-medium text-sm truncate w-full text-center text-white/95">{entry.name}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="space-y-2">
-              {currentChildren.map((entry) => (
-                <div
-                  key={entry.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg border border-white/10 bg-slate-900/40 hover:bg-white/5 transition cursor-pointer ${
-                    selectedPath === entry.path ? 'ring-2 ring-blue-500/70' : ''
-                  }`}
-                  draggable={entry.type === 'file'}
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData('text/plain', entry.path);
-                  }}
-                  onContextMenu={(event) => handleContextMenu(event, entry)}
-                  onMouseEnter={() => schedulePreview(entry)}
-                  onMouseLeave={clearPreview}
-                  onClick={() => {
-                    setSelectedPath(entry.path);
-                    if (entry.type === 'file') openEntry(entry);
-                    else setCurrentFolder(entry.path);
-                  }}
-                >
-                  {entry.type === 'folder' ? <Folder size={18} /> : React.cloneElement(getFileIcon(entry), { size: 18 })}
-                  <div className="flex-1 truncate">{entry.name}</div>
-                  <div className="text-xs text-white/40">{entry.type === 'folder' ? 'Dossier' : 'Fichier'}</div>
-                </div>
-              ))}
+            <div className="min-w-0">
+              <div className="sticky top-0 z-10 flex items-center gap-4 px-4 py-2.5 border-b border-white/10 bg-black/40 backdrop-blur-sm text-[11px] font-bold uppercase tracking-wider text-white/50">
+                <div className="w-10 shrink-0" />
+                <div className="flex-1 min-w-0">Nom</div>
+                <div className="w-24 shrink-0 text-right">Type</div>
+              </div>
+              <div className="divide-y divide-white/5">
+                {currentChildren.map((entry) => (
+                  <div
+                    key={entry.path}
+                    className={`webos-finder-list-row flex items-center gap-4 px-4 py-3 cursor-pointer ${
+                      selectedPath === entry.path ? 'bg-cyan-500/15 text-white' : 'hover:bg-white/5 text-white/90'
+                    }`}
+                    draggable={entry.type === 'file'}
+                    onDragStart={(e) => e.dataTransfer.setData('text/plain', entry.path)}
+                    onContextMenu={(e) => handleContextMenu(e, entry)}
+                    onMouseEnter={() => schedulePreview(entry)}
+                    onMouseLeave={clearPreview}
+                    onDoubleClick={() => {
+                      if (entry.type === 'file') openEntry(entry);
+                      else setCurrentFolder(entry.path);
+                    }}
+                    onClick={() => {
+                      setSelectedPath(entry.path);
+                      if (entry.type === 'folder') setCurrentFolder(entry.path);
+                    }}
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
+                      {entry.type === 'folder' ? (
+                        expanded.has(entry.path) ? (
+                          <FolderOpen size={20} className="text-amber-400" />
+                        ) : (
+                          <Folder size={20} className="text-amber-400" />
+                        )
+                      ) : (
+                        getFileIcon(entry, 20)
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0 truncate font-medium text-sm">{entry.name}</div>
+                    <div className="w-24 shrink-0 text-right text-xs text-white/50">
+                      {entry.type === 'folder' ? 'Dossier' : (entry.extension || '—').toUpperCase()}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
-      </div>
+      </main>
 
       {contextMenu && (
         <div
-          className="fixed z-[120] bg-slate-900 border border-white/10 rounded-lg shadow-xl text-sm"
+          className="fixed z-[120] py-1.5 min-w-[200px] rounded-2xl border border-white/10 shadow-2xl text-sm backdrop-blur-xl bg-slate-900/95"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
-          <button className="w-full text-left px-4 py-2 hover:bg-white/10" onClick={() => {
-            const entry = treeMap.get(contextMenu.path);
-            if (entry) openEntry(entry);
-            setContextMenu(null);
-          }}>
+          <button
+            className="w-full text-left px-4 py-2.5 hover:bg-white/10 flex items-center gap-3 text-white/90 transition"
+            onClick={() => {
+              const entry = treeMap.get(contextMenu.path);
+              if (entry) openEntry(entry);
+              setContextMenu(null);
+            }}
+          >
+            <FolderOpen size={16} className="text-cyan-400/80 shrink-0" />
             Ouvrir
           </button>
-          <button className="w-full text-left px-4 py-2 hover:bg-white/10" onClick={() => {
-            if (!contextMenu) return;
-            navigator.clipboard.writeText(contextMenu.path);
-            setContextMenu(null);
-          }}>
+          <button
+            className="w-full text-left px-4 py-2.5 hover:bg-white/10 flex items-center gap-3 text-white/90 transition"
+            onClick={() => {
+              if (!contextMenu) return;
+              navigator.clipboard.writeText(contextMenu.path);
+              setContextMenu(null);
+            }}
+          >
+            <File size={16} className="text-white/50 shrink-0" />
             Copier le chemin
           </button>
-          <button className="w-full text-left px-4 py-2 hover:bg-white/10" onClick={handleCopy}>
-            <span className="inline-flex items-center gap-2"><Clipboard size={14} /> Copier</span>
+          <div className="my-1 border-t border-white/10" />
+          <button className="w-full text-left px-4 py-2.5 hover:bg-white/10 flex items-center gap-3 text-white/90 transition" onClick={handleCopy}>
+            <Clipboard size={16} className="text-white/50 shrink-0" />
+            Copier
           </button>
-          <button className="w-full text-left px-4 py-2 hover:bg-white/10" onClick={handleCut}>
+          <button className="w-full text-left px-4 py-2.5 hover:bg-white/10 flex items-center gap-3 text-white/90 transition" onClick={handleCut}>
             Couper
           </button>
           <button
-            className="w-full text-left px-4 py-2 hover:bg-white/10"
+            className="w-full text-left px-4 py-2.5 hover:bg-white/10 flex items-center gap-3 text-white/90 transition disabled:opacity-50 disabled:pointer-events-none"
             onClick={() => handlePaste()}
             disabled={!clipboard}
           >
+            <Clipboard size={16} className="text-white/50 shrink-0" />
             Coller
           </button>
-          <button className="w-full text-left px-4 py-2 hover:bg-red-500/20 text-red-300" onClick={handleDelete}>
-            <span className="inline-flex items-center gap-2"><Trash2 size={14} /> Supprimer</span>
+          <div className="my-1 border-t border-white/10" />
+          <button
+            className="w-full text-left px-4 py-2.5 hover:bg-red-500/20 flex items-center gap-3 text-red-300/90 transition"
+            onClick={handleDelete}
+          >
+            <Trash2 size={16} className="shrink-0" />
+            Supprimer
           </button>
         </div>
       )}
 
       {preview && (
         <div
-          className="fixed z-[110] max-w-sm bg-slate-900/95 border border-white/10 rounded-xl shadow-2xl p-3 text-xs text-white/80"
-          style={{ left: Math.min(preview.x + 12, window.innerWidth - 360), top: Math.min(preview.y + 12, window.innerHeight - 240) }}
+          className="fixed z-[110] max-w-sm rounded-2xl border border-white/10 shadow-2xl overflow-hidden backdrop-blur-xl bg-slate-900/95"
+          style={{ left: Math.min(preview.x + 16, window.innerWidth - 340), top: Math.min(preview.y + 16, window.innerHeight - 260) }}
           onMouseLeave={clearPreview}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-white">{preview.title}</span>
-            <MoreHorizontal size={14} className="text-white/40" />
+          <div className="p-4 border-b border-white/10 flex items-center justify-between">
+            <span className="font-semibold text-white truncate pr-2">{preview.title}</span>
+            <MoreHorizontal size={16} className="text-white/40 shrink-0" />
           </div>
-          {preview.type === 'image' && preview.imageUrl && (
-            <img src={preview.imageUrl} className="w-full h-40 object-cover rounded-lg" />
-          )}
-          {preview.type === 'markdown' && (
-            <p className="text-white/70 leading-relaxed line-clamp-6">{preview.content}</p>
-          )}
-          {preview.type === 'other' && <div className="text-white/60">{preview.content}</div>}
+          <div className="p-4 text-xs text-white/80">
+            {preview.type === 'image' && preview.imageUrl && (
+              <img src={preview.imageUrl} alt="" className="w-full h-44 object-cover rounded-xl" />
+            )}
+            {preview.type === 'markdown' && (
+              <p className="text-white/70 leading-relaxed line-clamp-6">{preview.content}</p>
+            )}
+            {preview.type === 'other' && <div className="text-white/60 font-mono truncate">{preview.content}</div>}
+          </div>
         </div>
       )}
     </div>
