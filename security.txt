@@ -1,4 +1,4 @@
 Contact: https://github.com/infinition/obsidian-nova/issues
-Expires: 2027-01-31T05:00:14.000Z
+Expires: 2027-02-01T05:20:28.000Z
 Preferred-Languages: en, fr
 Policy: https://github.com/infinition/obsidian-nova/blob/wiki/SECURITY.md
