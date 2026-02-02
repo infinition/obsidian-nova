@@ -6,10 +6,10 @@ export const defaultWidgetIde: WebOSWidgetItem = {
   type: 'widget',
   title: 'Mini IDE',
   widgetId: 'widget-ide',
-  cols: 3,
-  rows: 3,
+  cols: 6,
+  rows: 8,
   bgColor: '#171717',
-  html: `<div class="flex flex-col h-full text-xs font-mono">
+  html: `<div class="flex flex-col h-full min-h-0 text-xs font-mono box-border overflow-hidden">
     <div class="flex justify-between items-center bg-[#262626] px-2 py-1 border-b border-white/10">
         <span class="text-yellow-500">script.js</span>
         <button class="bg-green-600 hover:bg-green-700 text-white px-2 rounded flex items-center gap-1 transition" onclick="runCode()">▶ Run</button>
@@ -22,9 +22,21 @@ alert('Result: ' + (a * 2));</textarea>
   css: `textarea { font-family: 'Fira Code', monospace; line-height: 1.4; }`,
   js: `const ta = container.querySelector('#code');
 const cons = container.querySelector('#console');
-// Load saved
-ta.value = localStorage.getItem('w-ide') || ta.value;
-ta.addEventListener('input', () => localStorage.setItem('w-ide', ta.value));
+const defaultCode = '// Write JS here\\nconst a = 10;\\nalert(\\'Result: \\' + (a * 2));';
+// Load: plugin (data.json) first, then localStorage fallback
+if (typeof api !== 'undefined' && api.getState) {
+  api.getState().then(function(s) {
+    if (s && typeof s === 'object' && s.code != null) ta.value = String(s.code);
+    else ta.value = localStorage.getItem('w-ide') || ta.value || defaultCode;
+  });
+  ta.addEventListener('input', function() {
+    api.saveState({ code: ta.value });
+    localStorage.setItem('w-ide', ta.value);
+  });
+} else {
+  ta.value = localStorage.getItem('w-ide') || ta.value || defaultCode;
+  ta.addEventListener('input', function() { localStorage.setItem('w-ide', ta.value); });
+}
 
 window.runCode = () => {
     try {
@@ -38,6 +50,6 @@ window.runCode = () => {
         cons.style.color = '#ef4444';
     }
 };`,
-  x: 5,
-  y: 8
+  x: 4,
+  y: 5
 };

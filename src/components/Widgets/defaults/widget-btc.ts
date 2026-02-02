@@ -6,10 +6,10 @@ export const defaultWidgetBtc: WebOSWidgetItem = {
   type: 'widget',
   title: 'Bitcoin Pro',
   widgetId: 'widget-btc',
-  cols: 2,
-  rows: 2,
+  cols: 8,
+  rows: 3,
   bgColor: '#111827',
-  html: `<div class="flex flex-col justify-between h-full p-3 bg-gradient-to-br from-gray-900 to-black text-white relative overflow-hidden">
+  html: `<div class="flex flex-col justify-between h-full min-h-0 p-3 bg-gradient-to-br from-gray-900 to-black text-white relative overflow-hidden box-border">
     <div class="absolute top-0 right-0 p-2 opacity-10 text-6xl">₿</div>
     <div class="flex items-center justify-between z-10">
         <div class="flex items-center gap-2">
@@ -39,6 +39,6 @@ const tick = setInterval(() => {
     p.innerText = '$' + (base + rand).toLocaleString();
 }, 3000);
 container._cleanup = () => clearInterval(tick);`,
-  x: 3,
-  y: 9
+  x: 1,
+  y: 8
 };

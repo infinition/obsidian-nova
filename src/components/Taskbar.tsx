@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Edit3, Grid, Monitor, Plus, Settings, Trash2 } from 'lucide-react';
+import { Edit3, Grid, Monitor, Plus, Settings } from 'lucide-react';
 import type { WebOSConfig } from '../types';
 
 interface TaskbarTheme {
@@ -19,8 +19,7 @@ interface TaskbarProps {
   currentPageLabel?: string;
   openWindows?: { id: string; title: string; isMinimized: boolean }[];
   onFocusWindow?: (id: string) => void;
-  showTrash?: boolean;
-  trashRef?: React.RefObject<HTMLDivElement>;
+  uiScale?: number;
 }
 
 export const Taskbar: React.FC<TaskbarProps> = ({
@@ -36,8 +35,7 @@ export const Taskbar: React.FC<TaskbarProps> = ({
   currentPageLabel,
   openWindows,
   onFocusWindow,
-  showTrash,
-  trashRef
+  uiScale = 1
 }) => {
   const [time, setTime] = useState(() => new Date());
   const barRef = useRef<HTMLDivElement | null>(null);
@@ -63,54 +61,66 @@ export const Taskbar: React.FC<TaskbarProps> = ({
     return () => window.removeEventListener('resize', update);
   }, [onHeightChange, config.barPosition, isEditing]);
 
+  const scaledHeight = Math.round(48 * uiScale);
+  const scaledWidth = Math.round(64 * uiScale);
+  const iconSize = Math.round(20 * uiScale);
+  const iconSizeSmall = Math.round(18 * uiScale);
+  const iconSizeTiny = Math.round(16 * uiScale);
+
   return (
     <div
       ref={barRef}
-      className={`webos-taskbar fixed z-30 backdrop-blur-md border-white/10 shadow-xl flex items-center justify-between px-4 gap-4 ${theme.bar}
-        ${config.barPosition === 'top' ? 'top-0 left-0 right-0 h-12 border-b' : ''}
-        ${config.barPosition === 'bottom' ? 'bottom-0 left-0 right-0 h-12 border-t' : ''}
-        ${config.barPosition === 'left' ? 'top-0 left-0 bottom-0 w-16 flex-col py-4 border-r' : ''}
-        ${config.barPosition === 'right' ? 'top-0 right-0 bottom-0 w-16 flex-col py-4 border-l' : ''}
+      className={`webos-taskbar fixed z-30 backdrop-blur-md border-white/10 shadow-xl flex items-center justify-between gap-4 ${theme.bar}
+        ${config.barPosition === 'top' ? 'top-0 left-0 right-0 border-b' : ''}
+        ${config.barPosition === 'bottom' ? 'bottom-0 left-0 right-0 border-t' : ''}
+        ${config.barPosition === 'left' ? 'top-0 left-0 bottom-0 flex-col py-4 border-r' : ''}
+        ${config.barPosition === 'right' ? 'top-0 right-0 bottom-0 flex-col py-4 border-l' : ''}
       `}
+      style={{
+        height: ['top', 'bottom'].includes(config.barPosition) ? scaledHeight : undefined,
+        width: ['left', 'right'].includes(config.barPosition) ? scaledWidth : undefined,
+        fontSize: `${uiScale * 0.875}rem`,
+        padding: `0 ${Math.round(16 * uiScale)}px`
+      }}
     >
-      <div className={`flex gap-4 ${['left', 'right'].includes(config.barPosition) ? 'flex-col' : ''}`}>
-        <button onClick={onToggleView} className="p-2 hover:bg-white/20 rounded-lg">
-          {config.viewMode === 'desktop' ? <Grid size={20} /> : <Monitor size={20} />}
+      <div className={`flex ${['left', 'right'].includes(config.barPosition) ? 'flex-col' : ''}`} style={{ gap: `${Math.round(16 * uiScale)}px` }}>
+        <button onClick={onToggleView} className="hover:bg-white/20 rounded-lg" style={{ padding: `${Math.round(8 * uiScale)}px` }}>
+          {config.viewMode === 'desktop' ? <Grid size={iconSize} /> : <Monitor size={iconSize} />}
         </button>
-        {isEditing && onOpenWidgetGallery && (
+        {onOpenWidgetGallery && (
           <button
             onClick={onOpenWidgetGallery}
-            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white"
+            className="rounded-lg bg-white/10 hover:bg-white/20 text-white"
             title="Ajouter un widget"
+            style={{ padding: `${Math.round(8 * uiScale)}px` }}
           >
-            <Plus size={18} />
+            <Plus size={iconSizeSmall} />
           </button>
         )}
-        {showTrash && (
-          <div
-            ref={trashRef}
-            className="w-10 h-10 rounded-full bg-red-500/90 border-2 border-white/20 shadow-lg flex items-center justify-center"
-            title="Supprimer"
-          >
-            <Trash2 size={18} className="text-white" />
-          </div>
-        )}
         {onOpenPages && (
-          <button onClick={onOpenPages} className="px-3 py-1 text-xs font-semibold rounded-full bg-white/10 hover:bg-white/20">
+          <button 
+            onClick={onOpenPages} 
+            className="font-semibold rounded-full bg-white/10 hover:bg-white/20"
+            style={{ padding: `${Math.round(4 * uiScale)}px ${Math.round(12 * uiScale)}px`, fontSize: `${uiScale * 0.75}rem` }}
+          >
             {currentPageLabel || 'Pages'}
           </button>
         )}
       </div>
 
-      <div className={`flex items-center gap-2 ${['left', 'right'].includes(config.barPosition) ? 'flex-col' : ''}`}>
+      {/* Espace flexible au centre */}
+      <div className={`flex-1 min-w-0 ${['left', 'right'].includes(config.barPosition) ? 'min-h-0' : ''}`} />
+
+      <div className={`flex items-center ${['left', 'right'].includes(config.barPosition) ? 'flex-col' : ''}`} style={{ gap: `${Math.round(8 * uiScale)}px` }}>
         {openWindows?.map((win) => (
           <button
             key={win.id}
             onClick={() => onFocusWindow?.(win.id)}
-            className={`px-2 py-1 rounded-md text-xs font-semibold transition ${
+            className={`rounded-md font-semibold transition ${
               win.isMinimized ? 'opacity-50 bg-white/5' : 'bg-white/10 hover:bg-white/20'
             }`}
             title={win.title}
+            style={{ padding: `${Math.round(4 * uiScale)}px ${Math.round(8 * uiScale)}px`, fontSize: `${uiScale * 0.75}rem` }}
           >
             {win.title}
           </button>
@@ -120,27 +130,28 @@ export const Taskbar: React.FC<TaskbarProps> = ({
       {isEditing ? (
         <button
           onClick={onToggleEdit}
-          className={`bg-blue-600 hover:bg-blue-500 text-white px-6 py-1 rounded-full font-bold flex items-center gap-2 animate-pulse ${
-            ['left', 'right'].includes(config.barPosition) ? 'vertical-text py-4' : ''
+          className={`bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold flex items-center animate-pulse ${
+            ['left', 'right'].includes(config.barPosition) ? 'vertical-text' : ''
           }`}
+          style={{ padding: `${Math.round(4 * uiScale)}px ${Math.round(24 * uiScale)}px`, gap: `${Math.round(8 * uiScale)}px` }}
         >
-          <Edit3 size={16} /> {['left', 'right'].includes(config.barPosition) ? '' : 'OK'}
+          <Edit3 size={iconSizeTiny} /> {['left', 'right'].includes(config.barPosition) ? '' : 'OK'}
         </button>
       ) : (
         <div className="flex-1" />
       )}
 
-      <div className={`flex items-center gap-4 ${['left', 'right'].includes(config.barPosition) ? 'flex-col-reverse' : ''}`}>
-        <span className="font-bold text-sm whitespace-nowrap">
+      <div className={`flex items-center ${['left', 'right'].includes(config.barPosition) ? 'flex-col-reverse' : ''}`} style={{ gap: `${Math.round(16 * uiScale)}px` }}>
+        <span className="font-bold whitespace-nowrap" style={{ fontSize: `${uiScale * 0.875}rem` }}>
           {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
         {!isEditing && (
-          <button onClick={onToggleEdit} className="p-2 hover:bg-white/20 rounded-lg" title="Mode Edition">
-            <Edit3 size={20} />
+          <button onClick={onToggleEdit} className="hover:bg-white/20 rounded-lg" title="Mode Edition" style={{ padding: `${Math.round(8 * uiScale)}px` }}>
+            <Edit3 size={iconSize} />
           </button>
         )}
-        <button onClick={onOpenSettings} className="p-2 hover:bg-white/20 rounded-lg">
-          <Settings size={20} />
+        <button onClick={onOpenSettings} className="hover:bg-white/20 rounded-lg" style={{ padding: `${Math.round(8 * uiScale)}px` }}>
+          <Settings size={iconSize} />
         </button>
       </div>
     </div>

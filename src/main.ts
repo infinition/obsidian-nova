@@ -5,13 +5,13 @@ export default class WebOSPlugin extends Plugin {
   async onload() {
     this.registerView(VIEW_TYPE_WEBOS, (leaf) => new WebOSView(leaf, this));
 
-    this.addRibbonIcon('monitor', 'Open Obsidian WebOS', () => {
+    this.addRibbonIcon('monitor', 'Open Nova', () => {
       this.activateView();
     });
 
     this.addCommand({
       id: 'open-webos',
-      name: 'Open Obsidian WebOS',
+      name: 'Open Nova',
       callback: () => this.activateView()
     });
   }

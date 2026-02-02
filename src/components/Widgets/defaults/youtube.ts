@@ -8,9 +8,9 @@ export const defaultYoutube: WebOSAppItem = {
   title: 'YouTube',
   url: 'https://www.youtube.com/embed/jfKfPfyJRdk',
   icon: '▶️',
-  cols: 1,
-  rows: 1,
-  x: 4,
+  cols: 3,
+  rows: 3,
+  x: 5,
   y: 1,
   bgColor: '#dc2626'
 };

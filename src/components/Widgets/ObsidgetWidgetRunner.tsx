@@ -97,26 +97,22 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
 
     if (!isSame) {
       const styleEl = document.createElement('style');
-      styleEl.textContent = `:host { display: block; position: relative; width: 100%; box-sizing: border-box; } ${css || ''}`;
+      // MODIFICATION ICI : overflow: hidden pour forcer le calcul JS à gérer la taille
+      styleEl.textContent = `
+:host {
+  display: block; position: relative; width: 100%; height: 100%;
+  box-sizing: border-box; min-width: 0; min-height: 0;
+  overflow: hidden;
+}
+[data-root="widget-root"] > * {
+  min-width: 0; min-height: 0;
+}
+${css || ''}`;
       shadow.appendChild(styleEl);
 
       rootElement.innerHTML = (html || '') + '<slot></slot>';
       shadow.appendChild(rootElement);
       lastInitRef.current = { id, html, css, js };
-    }
-
-    // Ne pas toucher au resize/overflow du widget : le resize natif CSS (resize: both)
-    // reste actif ; la grille suit la taille via ResizeObserver sur root + firstChild.
-
-    if (!isSame) {
-      const resizeHandle = rootElement.querySelector('.obsidget-resize-handle');
-      if (resizeHandle) {
-        container.style.display = 'inline-block';
-        container.style.width = 'fit-content';
-        container.style.height = 'fit-content';
-        container.style.maxWidth = '100%';
-        container.style.maxHeight = '100%';
-      }
     }
 
     const instanceId = id;
@@ -177,11 +173,21 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
       documentElement: document.documentElement
     };
 
+    const safeWindow = new Proxy(window, {
+      get(target, prop) {
+        if (prop === 'open') {
+          return () => null;
+        }
+        return (target as Record<string, unknown>)[prop as string];
+      }
+    });
+
     const widgetApi = {
       root: rootProxy,
       instanceId,
       app: api.getObsidianApp(),
       document: documentProxy,
+      window: safeWindow,
       saveState: async (data: unknown) => {
         await api.saveWidgetState(instanceId, data);
       },
@@ -194,6 +200,7 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
       updateFrontmatter: async (data: Record<string, unknown>, path?: string) =>
         api.updateFrontmatter(data, path),
       getFiles: async (extension?: string) => api.getFiles(extension),
+      listVaultTree: async () => api.listVaultTree(),
       readFile: async (path: string) => api.readFile(path),
       writeFile: async (path: string, contents: string) => api.writeFile(path, contents),
       parseCSV,
@@ -332,6 +339,23 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
       console.error(`Obsidget widget "${id}" runtime init failed:`, err);
     }
 
+    const handleLinkClick = (e: Event) => {
+      const path = e.composedPath?.() ?? (e.target ? [(e.target as Node)] : []);
+      for (let i = 0; i < path.length; i += 1) {
+        const el = path[i] as HTMLElement;
+        if (el?.tagName !== 'A') continue;
+        const href = el.getAttribute?.('href');
+        if (!href) continue;
+        e.preventDefault();
+        const trimmed = href.trim().toLowerCase();
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('//')) {
+          e.stopPropagation();
+        }
+        return;
+      }
+    };
+    container.addEventListener('click', handleLinkClick, true);
+
     if (!isSame) {
       cleanupRef.current = () => {
         shadow.innerHTML = '';
@@ -340,11 +364,13 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
 
     return () => {
       cancelled = true;
+      container.removeEventListener('click', handleLinkClick, true);
       if (cleanupRef.current) cleanupRef.current();
       cleanupRef.current = null;
     };
   }, [api, css, html, id, js, maxWidth]);
 
+  // --------------- LOGIQUE HYBRIDE : Largeur Auto / Hauteur Manuelle ---------------
   useEffect(() => {
     if (!onSizeChange) return;
     const container = containerRef.current;
@@ -352,32 +378,49 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
     const shadow = container.shadowRoot;
     const rootElement = shadow?.querySelector('[data-root="widget-root"]') as HTMLDivElement | null;
     if (!rootElement) return;
+    
     lastSizeRef.current = null;
 
-    const getMaxContentHeight = () => {
+    // MODIFICATION ICI : Calcul de la taille réelle (Hauteur ET Largeur)
+    const getContentSize = () => {
       let maxHeight = rootElement.scrollHeight;
+      let maxWidth = rootElement.scrollWidth;
+
+      // On scanne tous les éléments pour trouver le contenu le plus large/haut
       const elements = rootElement.querySelectorAll<HTMLElement>('*');
       elements.forEach((el) => {
         const h = Math.max(el.scrollHeight, el.offsetHeight);
         if (h > maxHeight) maxHeight = h;
+
+        const w = Math.max(el.scrollWidth, el.offsetWidth);
+        if (w > maxWidth) maxWidth = w;
       });
-      return maxHeight;
+      return { width: maxWidth, height: maxHeight };
     };
 
     const emitSize = (rectOverride?: DOMRectReadOnly) => {
       const rect = rectOverride ?? rootElement.getBoundingClientRect();
-      const width = rect.width;
-      // Quand on a un rectOverride (ex. resize natif du widget), utiliser ses dimensions exactes
-      const height = rectOverride ? rect.height : Math.max(rect.height, getMaxContentHeight());
+      const contentSize = getContentSize();
+
+      // Si resize manuel (rectOverride), on utilise cette taille.
+      // Sinon, on prend le MAX entre la taille actuelle de la boîte et le contenu interne.
+      // C'est ce qui fait que la poignée "suit" le contenu.
+      const width = rectOverride ? rect.width : Math.max(rect.width, contentSize.width);
+      const height = rectOverride ? rect.height : Math.max(rect.height, contentSize.height);
+
       if (width <= 0 || height <= 0) return;
+      
       const last = lastSizeRef.current;
       if (last && Math.abs(last.width - width) < 0.5 && Math.abs(last.height - height) < 0.5) return;
+      
       lastSizeRef.current = { width, height };
       onSizeChange({ width, height });
     };
 
     const scheduleEmit = () => {
-      if (resizeRafRef.current != null) return;
+      if (resizeRafRef.current != null) {
+        window.cancelAnimationFrame(resizeRafRef.current);
+      }
       resizeRafRef.current = window.requestAnimationFrame(() => {
         resizeRafRef.current = null;
         emitSize();
@@ -391,13 +434,13 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
       resizeObserver = new ResizeObserver((entries) => {
         const entry = entries[0];
         if (entry?.contentRect) {
-          // Utiliser la taille de l'élément qui a changé (root ou firstChild avec resize:native)
           emitSize(entry.contentRect);
           return;
         }
         scheduleEmit();
       });
       resizeObserver.observe(rootElement);
+      // On observe aussi le premier enfant car souvent c'est lui qui change de taille en CSS
       const firstChild = rootElement.firstElementChild as HTMLElement | null;
       if (firstChild) {
         resizeObserver.observe(firstChild);
@@ -426,10 +469,10 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
   }, [css, html, id, js, onSizeChange]);
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full min-w-0 min-h-0 relative">
       <div
         ref={containerRef}
-        className="w-full h-full overflow-hidden"
+        className="w-full h-full min-w-0 min-h-0 overflow-hidden"
         onPointerDown={(event) => !isEditing && !event.altKey && event.stopPropagation()}
         onTouchStart={(event) => !isEditing && !event.altKey && event.stopPropagation()}
       />

@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-webos",
+  "name": "obsidian-nova",
   "version": "0.1.0",
-  "description": "Obsidian WebOS plugin with a desktop-like interface.",
+  "description": "Obsidian Nova plugin with a desktop-like interface.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

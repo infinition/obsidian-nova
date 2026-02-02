@@ -62,6 +62,18 @@ export interface WebOSConfig {
   pageDotsDurationMs?: number;
   /** Bulle floutée sous les points pour lisibilité */
   pageDotsBlurBubble?: boolean;
+  /** Échelle des éléments UI (barre, menus, modales) (0.5 = 50 %, 1 = 100 %, 1.5 = 150 %) */
+  uiScale?: number;
+  /** Échelle des widgets et icônes sur le desktop (0.5 = 50 %, 1 = 100 %, 1.5 = 150 %) */
+  widgetScale?: number;
+  /** Densité de la grille : nombre de colonnes × lignes (ex. 48 = grille 48×48, cellules plus petites). Synchronisé horizontal/vertical. */
+  gridSize?: number;
+  /** Si true, Page Up / Page Down modifient la densité de la grille (au lieu du scale widgets). */
+  pageUpDownChangesGridDensity?: boolean;
+  /** Chemins favoris du Finder (sidebar) */
+  finderFavorites?: string[];
+  /** Afficher en console les dimensions et position des widgets après redimensionnement/déplacement (pour définir cols/rows à la main dans le code) */
+  debugWidgetDimensions?: boolean;
 }
 
 export type WindowKind = 'url' | 'finder' | 'image' | 'note' | 'todo' | 'custom' | 'widget';
@@ -86,6 +98,23 @@ export interface WebOSWindow {
   isMaximized: boolean;
 }
 
+/**
+ * Standard de taille des widgets (Nova + Obsidget).
+ * Toutes les valeurs sont en unités logiques de grille (1..24).
+ */
+export interface WidgetSizeSpec {
+  /** Taille par défaut (logique). */
+  defaultCols: number;
+  defaultRows: number;
+  /** Bornes min/max pour le redimensionnement. */
+  minCols?: number;
+  minRows?: number;
+  maxCols?: number;
+  maxRows?: number;
+  /** 'free' = redimensionnement libre ; 'preserveAspect' = garder ratio ; 'fixed' = non redimensionnable. */
+  resizeMode?: 'free' | 'preserveAspect' | 'fixed';
+}
+
 export interface WebOSWidgetTemplate {
   id: string;
   title: string;
@@ -97,6 +126,10 @@ export interface WebOSWidgetTemplate {
   css?: string;
   js?: string;
   source?: 'webos' | 'obsidget';
+  /** Spec de taille unifié (optionnel). Si absent, cols/rows = défaut, pas de contraintes. */
+  sizeSpec?: WidgetSizeSpec;
+  /** Si true (ex. Kanban), le widget peut grandir au-delà de cols/rows du template. Sinon (ex. Code Garden), plafonné au template. */
+  allowGrowBeyondTemplate?: boolean;
 }
 
 export interface WebOSData {
@@ -105,6 +138,8 @@ export interface WebOSData {
   windows: WebOSWindow[];
   widgetTemplates?: WebOSWidgetTemplate[];
   widgetState?: Record<string, unknown>;
+  /** Version du format (>= 2 : items déjà en unités grille, pas de migration cols/rows) */
+  dataVersion?: number;
 }
 
 export interface VaultEntry {
@@ -135,5 +170,7 @@ export interface WebOSAPI {
   getFiles(extension?: string): Promise<string[]>;
   loadWidgetState(id: string): Promise<unknown | null>;
   saveWidgetState(id: string, data: unknown): Promise<void>;
+  /** Affiche un toast (Notice Obsidian). duration en ms, optionnel. */
+  showNotice(message: string, duration?: number): void;
 }
 

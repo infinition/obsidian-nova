@@ -3,6 +3,7 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Desktop } from './components/Desktop';
 import { createBridge } from './services/bridge';
+import type { WebOSData } from './types';
 import type WebOSPlugin from './main';
 
 export const VIEW_TYPE_WEBOS = 'webos-view';
@@ -21,16 +22,20 @@ export class WebOSView extends ItemView {
   }
 
   getDisplayText() {
-    return 'Obsidian WebOS';
+    return 'Nova';
   }
 
   async onOpen() {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass('webos-view-container');
-    const rootEl = container.createDiv();
+    const rootEl = container.createDiv({ cls: 'webos-view-root' });
     this.root = createRoot(rootEl);
-    this.root.render(<Desktop api={createBridge(this.plugin)} />);
+    const currentStateRef = { current: null as WebOSData | null };
+    const api = createBridge(this.plugin, {
+      getCurrentState: () => currentStateRef.current
+    });
+    this.root.render(<Desktop api={api} currentStateRef={currentStateRef} />);
   }
 
   async onClose() {

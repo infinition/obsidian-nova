@@ -4,8 +4,8 @@ export const WIDGET_TEMPLATES: WebOSWidgetTemplate[] = [
   {
     id: 'clock',
     title: 'Horloge',
-    cols: 2,
-    rows: 1,
+    cols: 5,
+    rows: 3,
     bgColor: '#334155',
     kind: 'runner',
     html: `<div id="clock" class="flex flex-col items-center justify-center h-full text-white font-mono">
@@ -33,8 +33,8 @@ export const WIDGET_TEMPLATES: WebOSWidgetTemplate[] = [
   {
     id: 'weather',
     title: 'Meteo',
-    cols: 2,
-    rows: 1,
+    cols: 5,
+    rows: 3,
     bgColor: 'glass',
     kind: 'runner',
     html: `<div class="flex items-center justify-between px-4 h-full text-white">
@@ -48,8 +48,8 @@ export const WIDGET_TEMPLATES: WebOSWidgetTemplate[] = [
   {
     id: 'calendar',
     title: 'Calendrier',
-    cols: 2,
-    rows: 2,
+    cols: 4,
+    rows: 4,
     bgColor: '#ffffff',
     kind: 'runner',
     html: `<div class="h-full flex flex-col p-2 text-slate-800">
@@ -62,105 +62,21 @@ export const WIDGET_TEMPLATES: WebOSWidgetTemplate[] = [
     container.querySelector('#day').innerText = now.getDate();
     container.querySelector('#weekday').innerText = now.toLocaleString('default', { weekday: 'long' });`
   },
-  {
-    id: 'calculator',
-    title: 'Calculatrice',
-    cols: 2,
-    rows: 2,
-    bgColor: '#1f2937',
-    kind: 'runner',
-    html: `<div class="grid grid-cols-4 gap-1 h-full p-1">
-      <div id="disp" class="col-span-4 bg-gray-900 text-white flex items-center justify-end px-2 rounded mb-1 text-xl">0</div>
-      <button class="bg-gray-700 text-white rounded hover:bg-gray-600">7</button>
-      <button class="bg-gray-700 text-white rounded hover:bg-gray-600">8</button>
-      <button class="bg-gray-700 text-white rounded hover:bg-gray-600">9</button>
-      <button class="bg-orange-500 text-white rounded">+</button>
-      <button class="bg-gray-700 text-white rounded hover:bg-gray-600">4</button>
-      <button class="bg-gray-700 text-white rounded hover:bg-gray-600">5</button>
-      <button class="bg-gray-700 text-white rounded hover:bg-gray-600">6</button>
-      <button class="bg-orange-500 text-white rounded">-</button>
-      <button class="bg-gray-700 text-white rounded hover:bg-gray-600">1</button>
-      <button class="bg-gray-700 text-white rounded hover:bg-gray-600">2</button>
-      <button class="bg-gray-700 text-white rounded hover:bg-gray-600">3</button>
-      <button class="bg-blue-500 text-white rounded row-span-2">=</button>
-      <button class="bg-gray-700 text-white rounded hover:bg-gray-600 col-span-2">0</button>
-      <button class="bg-red-500 text-white rounded">C</button>
-    </div>`,
-    css: `button { transition: background 0.1s; } button:active { transform: scale(0.95); }`,
-    js: `const d = container.querySelector('#disp');
-    let c = '';
-    container.querySelectorAll('button').forEach(b => {
-      const t = b.innerText;
-      if(t === '=') b.onclick = () => { try { c = String(eval(c)); d.innerText = c; } catch { d.innerText = 'Err'; c=''; } };
-      else if(t === 'C') b.onclick = () => { c = ''; d.innerText = '0'; };
-      else b.onclick = () => { c += t; d.innerText = c; };
-    });`
-  },
-  {
-    id: 'todo',
-    title: 'To-Do',
-    cols: 2,
-    rows: 2,
-    bgColor: '#ffffff',
-    kind: 'react'
-  },
-  {
-    id: 'pomodoro',
-    title: 'Pomodoro',
-    cols: 2,
-    rows: 2,
-    bgColor: '#e11d48',
-    kind: 'runner',
-    html: `<div class="flex flex-col items-center justify-center h-full text-white">
-      <div class="text-4xl font-mono font-bold mb-2" id="timer">25:00</div>
-      <div class="flex gap-2">
-        <button id="start" class="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center hover:bg-white hover:text-red-600 transition">></button>
-        <button id="reset" class="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center hover:bg-white hover:text-red-600 transition">R</button>
-      </div>
-    </div>`,
-    js: `let time = 1500; let int = null;
-    const disp = container.querySelector('#timer');
-    const update = () => {
-      const minutes = Math.floor(time / 60).toString().padStart(2,'0');
-      const seconds = (time % 60).toString().padStart(2,'0');
-      disp.innerText = minutes + ':' + seconds;
-    };
-    container.querySelector('#start').onclick = () => {
-      if(int) { clearInterval(int); int=null; }
-      else { int = setInterval(() => { if(time>0) { time--; update(); } else { clearInterval(int); alert('Fini!'); } }, 1000); }
-    };
-    container.querySelector('#reset').onclick = () => { clearInterval(int); int=null; time=1500; update(); };
-    container._cleanup = () => clearInterval(int);`
-  },
-  {
-    id: 'breath',
-    title: 'Respire',
-    cols: 2,
-    rows: 2,
-    bgColor: '#8b5cf6',
-    kind: 'runner',
-    html: `<div class="flex flex-col items-center justify-center h-full text-white relative overflow-hidden">
-      <div class="circle absolute bg-white/20 rounded-full"></div>
-      <div class="text-lg font-bold z-10 animate-pulse">Inhale... Exhale</div>
-    </div>`,
-    css: `.circle { width: 50px; height: 50px; animation: breathe 4s infinite ease-in-out; }
-    @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(3); } }`
-  },
-  {
+{
     id: 'game-2048',
     title: '2048',
-    cols: 2,
-    rows: 2,
+    cols: 8,
+    rows: 9,
     bgColor: '#0f172a',
     kind: 'runner',
     html: `<div class="g2048">
       <div class="g2048-head">
         <div class="g2048-title">2048</div>
         <div id="g2048-score" class="g2048-score">0</div>
-        <button id="g2048-new" class="g2048-new">Nouveau</button>
+        <button id="g2048-new" class="g2048-new">New</button>
       </div>
       <div id="g2048-grid" class="g2048-grid"></div>
-      <div id="g2048-msg" class="g2048-msg">Utilise les fleches</div>
+      <div id="g2048-msg" class="g2048-msg">Use arrows or click edges</div>
     </div>`,
     css: `.g2048 { height: 100%; padding: 10px; color: #e2e8f0; border-radius: 14px; background: radial-gradient(circle at top, rgba(251,191,36,0.15), transparent 60%), linear-gradient(135deg, #0f172a, #111827 60%); border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 6px; }
 .g2048-head { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
@@ -270,9 +186,9 @@ const hasMoves = () => {
 
 const checkState = () => {
   const won = grid.some((row) => row.includes(2048));
-  if (won) setMsg('Bravo, 2048 !');
-  else if (!hasMoves()) setMsg('Perdu. Nouveau ?');
-  else setMsg('Utilise les fleches');
+  if (won) setMsg('You reached 2048!');
+  else if (!hasMoves()) setMsg('Game over. New game?');
+  else setMsg('Use arrows or click edges');
 };
 
 const render = () => {
@@ -311,6 +227,17 @@ const onKey = (event) => {
   }
 };
 
+const onGridClick = (event) => {
+  if (!gridEl) return;
+  const rect = gridEl.getBoundingClientRect();
+  const x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
+  if (x < 0.25) move('left');
+  else if (x > 0.75) move('right');
+  else if (y < 0.25) move('up');
+  else if (y > 0.75) move('down');
+};
+
 let touchStart = null;
 const onTouchStart = (event) => {
   if (!event.touches || event.touches.length === 0) return;
@@ -337,29 +264,37 @@ if (root) {
   root.addEventListener('touchstart', onTouchStart, { passive: true });
   root.addEventListener('touchend', onTouchEnd, { passive: true });
 }
+if (gridEl) {
+  gridEl.style.cursor = 'pointer';
+  gridEl.addEventListener('click', onGridClick);
+}
 if (newBtn) newBtn.onclick = reset;
 reset();
 container._cleanup = () => {
   if (root) root.removeEventListener('keydown', onKey);
   if (root) root.removeEventListener('touchstart', onTouchStart);
   if (root) root.removeEventListener('touchend', onTouchEnd);
+  if (gridEl) gridEl.removeEventListener('click', onGridClick);
 };`
   },
   {
     id: 'chifoumi',
-    title: 'Chifoumi',
-    cols: 2,
-    rows: 2,
+    title: 'Rock Paper Scissors',
+    cols: 10,
+    rows: 6,
     bgColor: '#111827',
     kind: 'runner',
     html: `<div class="rps-root">
       <div class="rps-head">
-        <div class="rps-title">Chifoumi</div>
-        <div id="rps-score" class="rps-score">0 - 0</div>
+        <div class="rps-title">Rock Paper Scissors</div>
+        <div class="rps-meta">
+            <div id="rps-score" class="rps-score">0 - 0</div>
+            <button id="rps-reset" class="rps-reset" title="Restart">↻</button>
+        </div>
       </div>
       <div class="rps-arena">
         <div class="rps-side">
-          <div class="rps-label">Toi</div>
+          <div class="rps-label">You</div>
           <div id="rps-you" class="rps-hand">✊</div>
         </div>
         <div class="rps-vs">VS</div>
@@ -368,7 +303,7 @@ container._cleanup = () => {
           <div id="rps-cpu" class="rps-hand">✊</div>
         </div>
       </div>
-      <div id="rps-msg" class="rps-msg">Choisis ton coup</div>
+      <div id="rps-msg" class="rps-msg">Choose your move</div>
       <div class="rps-actions">
         <button class="rps-btn" data-move="rock">✊</button>
         <button class="rps-btn" data-move="paper">✋</button>
@@ -377,8 +312,11 @@ container._cleanup = () => {
     </div>`,
     css: `.rps-root { height: 100%; padding: 10px; color: #e2e8f0; border-radius: 14px; background: radial-gradient(circle at top, rgba(59,130,246,0.2), transparent 60%), linear-gradient(135deg, #0f172a, #111827 60%); border: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 6px; }
 .rps-head { display: flex; align-items: center; justify-content: space-between; }
+.rps-meta { display: flex; align-items: center; gap: 8px; }
 .rps-title { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: #93c5fd; font-weight: 700; }
 .rps-score { font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 999px; }
+.rps-reset { background: none; border: none; color: #64748b; font-size: 14px; cursor: pointer; padding: 2px; transition: all 0.2s; line-height: 1; border-radius: 4px; }
+.rps-reset:hover { color: #fff; background: rgba(255,255,255,0.1); transform: rotate(180deg); }
 .rps-arena { flex: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
 .rps-side { text-align: center; }
 .rps-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #94a3b8; }
@@ -395,6 +333,7 @@ container._cleanup = () => {
 const cpu = container.querySelector('#rps-cpu');
 const msg = container.querySelector('#rps-msg');
 const score = container.querySelector('#rps-score');
+const resetBtn = container.querySelector('#rps-reset');
 const icons = { rock: '✊', paper: '✋', scissors: '✌️' };
 const moves = ['rock', 'paper', 'scissors'];
 let youScore = 0;
@@ -415,6 +354,17 @@ const pop = (el) => {
   el.classList.add('rps-pop');
 };
 
+// Logique du bouton reset
+resetBtn.onclick = () => {
+    youScore = 0;
+    cpuScore = 0;
+    if (score) score.innerText = '0 - 0';
+    if (msg) msg.innerText = 'Choose your move';
+    if (you) you.innerText = '✊';
+    if (cpu) cpu.innerText = '✊';
+    pop(score);
+};
+
 container.querySelectorAll('.rps-btn').forEach((btn) => {
   btn.onclick = () => {
     const choice = btn.getAttribute('data-move');
@@ -426,12 +376,12 @@ container.querySelectorAll('.rps-btn').forEach((btn) => {
     const result = decide(choice, cpuChoice);
     if (result === 'win') {
       youScore += 1;
-      if (msg) msg.innerText = 'Bien joue !';
+      if (msg) msg.innerText = 'You win!';
     } else if (result === 'lose') {
       cpuScore += 1;
-      if (msg) msg.innerText = 'Ouch... encore !';
+      if (msg) msg.innerText = 'You lose. Try again!';
     } else {
-      if (msg) msg.innerText = 'Egalite !';
+      if (msg) msg.innerText = 'Draw!';
     }
     if (score) score.innerText = youScore + ' - ' + cpuScore;
   };

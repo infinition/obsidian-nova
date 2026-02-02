@@ -1,42 +1,18 @@
 import type { WebOSItem } from '../../../types';
-import { defaultFinder } from './finder';
-import { defaultBrowser } from './browser';
-import { defaultYoutube } from './youtube';
-import { defaultWidgetBtc } from './widget-btc';
-import { defaultWidgetCalc } from './widget-calc';
-import { defaultWidgetTictactoe } from './widget-tictactoe';
-import { defaultWidgetSystem } from './widget-system';
-import { defaultWidgetPing } from './widget-ping';
-import { defaultWidgetWaterAdv } from './widget-water-adv';
-import { defaultWidgetCoffee } from './widget-coffee';
-import { defaultWidgetKanban } from './widget-kanban';
-import { defaultWidgetIde } from './widget-ide';
+import { DEFAULT_ITEMS_BASE } from './defaultsRegistry';
 
-/** Items par défaut du bureau (apps + widgets inline). Les widgets issus de templates (2048, chifoumi) sont ajoutés dans Desktop.tsx via buildWidgetItem. */
-export const DEFAULT_ITEMS_BASE: WebOSItem[] = [
-  defaultFinder,
-  defaultBrowser,
-  defaultYoutube,
-  defaultWidgetBtc,
-  defaultWidgetCalc,
-  defaultWidgetTictactoe,
-  defaultWidgetSystem,
-  defaultWidgetPing,
-  defaultWidgetWaterAdv,
-  defaultWidgetCoffee,
-  defaultWidgetKanban,
-  defaultWidgetIde
-];
+/** Default desktop items (apps + inline widgets). Template widgets (2048, RPS) are added in Desktop.tsx via buildWidgetItem. */
+export { DEFAULT_ITEMS_BASE };
 
-/** Apps intégrées affichées dans la galerie pour pouvoir les remettre si supprimées */
+/** Built-in apps shown in the gallery so they can be re-added if removed */
 export const BUILT_IN_APP_TEMPLATES: WebOSItem[] = [
   {
     id: 'finder',
     type: 'app',
     title: 'Finder',
     icon: 'F',
-    cols: 1,
-    rows: 1,
+    cols: 2,
+    rows: 2,
     bgColor: '#3b82f6',
     appId: 'finder'
   },
@@ -45,8 +21,8 @@ export const BUILT_IN_APP_TEMPLATES: WebOSItem[] = [
     type: 'app',
     title: 'Web',
     icon: 'W',
-    cols: 1,
-    rows: 1,
+    cols: 2,
+    rows: 2,
     bgColor: '#ffffff',
     url: 'https://obsidian.md',
     appId: 'browser'

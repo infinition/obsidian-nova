@@ -4,26 +4,29 @@ export const defaultWidgetTictactoe: WebOSWidgetItem = {
   id: 'widget-tictactoe',
   pageIndex: 0,
   type: 'widget',
-  title: 'Morpion Neon',
+  title: 'Neon Tic-Tac-Toe',
   widgetId: 'widget-tictactoe',
-  cols: 3,
-  rows: 3,
+  cols: 8,
+  rows: 9,
   bgColor: '#475569',
-  html: `<div class="relative flex flex-col h-full bg-slate-800 p-2">
-    <div class="flex items-center justify-between mb-1">
-        <span class="text-xs text-gray-400 uppercase tracking-widest">Morpion</span>
-        <button id="reset" class="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white hover:bg-white/20 uppercase tracking-widest">Recommencer</button>
+  html: `<div class="relative flex flex-col h-full min-h-0 bg-slate-800 p-2 box-border overflow-hidden">
+    <div class="flex items-center justify-between mb-1 shrink-0">
+        <span class="text-xs text-gray-400 uppercase tracking-widest">Tic-Tac-Toe</span>
+        <button id="reset" class="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white hover:bg-white/20 uppercase tracking-widest transition active:scale-95">Restart</button>
     </div>
-    <div id="status" class="text-[10px] text-slate-300 mb-1">X commence</div>
-    <div class="grid grid-cols-3 gap-1 flex-1" id="grid"></div>
+    <div id="status" class="text-[10px] text-slate-300 mb-1 shrink-0">X's turn</div>
+    <div class="flex-1 min-h-0 flex items-center justify-center" id="grid-wrap">
+      <div class="grid grid-cols-3 gap-1 w-full h-full min-w-0 min-h-0" id="grid"></div>
+    </div>
     <div id="overlay" class="absolute inset-0 hidden items-center justify-center bg-black/70 backdrop-blur-sm">
         <div class="bg-slate-900/90 border border-white/10 rounded-xl px-4 py-3 text-center shadow-xl">
-            <div id="winner-text" class="text-lg font-bold text-white mb-2">X a gagne !</div>
-            <button id="play-again" class="px-3 py-1 text-[10px] rounded-full bg-white/10 hover:bg-white/20 text-white uppercase tracking-widest">Recommencer</button>
+            <div id="winner-text" class="text-lg font-bold text-white mb-2">X wins!</div>
+            <button id="play-again" class="px-3 py-1 text-[10px] rounded-full bg-white/10 hover:bg-white/20 text-white uppercase tracking-widest transition active:scale-95">Restart</button>
         </div>
     </div>
 </div>`,
-  css: `#grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 6px; flex: 1 1 auto; min-height: 0; align-items: stretch; justify-items: stretch; }
+  css: `#grid-wrap { container-type: size; display: flex; align-items: center; justify-content: center; min-height: 0; width: 100%; height: 100%; }
+#grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 6px; width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); min-width: 0; min-height: 0; align-items: stretch; justify-items: stretch; }
 .cell { background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 900; line-height: 1; color: white; cursor: pointer; border-radius: 6px; transition: background 0.2s, transform 0.1s; aspect-ratio: 1 / 1; width: 100%; height: 100%; padding: 0; min-width: 0; min-height: 0; overflow: hidden; }
 .cell:hover { background: rgba(255,255,255,0.06); }
 .cell:active { transform: scale(0.98); }
@@ -48,7 +51,7 @@ let isOver = false;
 
 const updateStatus = () => {
   if (!status) return;
-  status.innerText = isOver ? 'Partie terminee' : turn + ' a toi';
+  status.innerText = isOver ? 'Game over' : turn + \"'s turn\";
 };
 
 const check = () => {
@@ -97,15 +100,13 @@ const render = () => {
       if (board[idx] || isOver) return;
       board[idx] = turn;
       const result = check();
-      if (result) {
-        isOver = true;
-      } else {
-        turn = turn === 'X' ? 'O' : 'X';
-      }
+      if (result) isOver = true;
+      else turn = turn === 'X' ? 'O' : 'X';
+      if (typeof api !== 'undefined' && api.saveState) api.saveState({ board: board.slice(), turn, isOver });
       render();
       if (result) {
-        if (result.winner === 'draw') showOverlay('Match nul ✨');
-        else showOverlay(result.winner + ' a gagne !', result.line);
+        if (result.winner === 'draw') showOverlay('Draw ✨');
+        else showOverlay(result.winner + ' wins!', result.line);
       }
       updateStatus();
     };
@@ -117,6 +118,7 @@ const resetGame = () => {
   board = Array(9).fill(null);
   turn = 'X';
   isOver = false;
+  if (typeof api !== 'undefined' && api.saveState) api.saveState({ board: board.slice(), turn, isOver });
   hideOverlay();
   render();
   updateStatus();
@@ -124,8 +126,18 @@ const resetGame = () => {
 
 if (r) r.onclick = resetGame;
 if (playAgain) playAgain.onclick = resetGame;
-render();
-updateStatus();`,
-  x: 13,
+
+if (typeof api !== 'undefined' && api.getState) {
+  api.getState().then(function(s) {
+    if (s && s.board && Array.isArray(s.board) && s.board.length === 9) {
+      board = s.board.slice();
+      turn = (s.turn === 'O' ? 'O' : 'X');
+      isOver = !!s.isOver;
+    }
+    render();
+    updateStatus();
+  });
+} else { render(); updateStatus(); }`,
+  x: 8,
   y: 2
 };

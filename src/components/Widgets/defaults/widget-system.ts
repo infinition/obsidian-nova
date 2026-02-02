@@ -4,12 +4,12 @@ export const defaultWidgetSystem: WebOSWidgetItem = {
   id: 'widget-system',
   pageIndex: 0,
   type: 'widget',
-  title: 'Système Cyber',
+  title: 'Cyber System',
   widgetId: 'widget-system',
-  cols: 2,
-  rows: 2,
+  cols: 8,
+  rows: 4,
   bgColor: '#000',
-  html: `<div class="flex h-full p-4 gap-4 items-center bg-gray-900 border border-white/10">
+  html: `<div class="flex h-full min-h-0 p-4 gap-4 items-center bg-gray-900 border border-white/10 box-border overflow-hidden">
     
     <div class="flex-1 flex flex-col items-center">
         <div class="relative w-16 h-16 flex items-center justify-center">
@@ -51,6 +51,6 @@ const inv = setInterval(() => {
     container.querySelector('#gpu-bar').style.width = gpu+'%';
 }, 2000);
 container._cleanup = () => clearInterval(inv);`,
-  x: 3,
-  y: 11
+  x: 7,
+  y: 7
 };

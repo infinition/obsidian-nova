@@ -1,4 +1,4 @@
-import { TFile, TFolder, normalizePath, requestUrl } from 'obsidian';
+import { Notice, TFile, TFolder, normalizePath, requestUrl } from 'obsidian';
 import type { WebOSAPI, WebOSData, VaultEntry } from '../types';
 import type WebOSPlugin from '../main';
 
@@ -49,17 +49,28 @@ const buildTree = (plugin: WebOSPlugin, folder: TFolder): VaultEntry | null => {
   };
 };
 
+const OBSIDGET_PLUGIN_IDS = ['obsidian-obsidget-ts', 'obsidian-obsidget'] as const;
+
 const getObsidgetPlugin = (plugin: WebOSPlugin) => {
-  const obsidget = (plugin.app as unknown as { plugins?: { getPlugin?: (id: string) => unknown } })
-    .plugins?.getPlugin?.('obsidian-obsidget');
-  return obsidget ?? null;
+  const plugins = (plugin.app as unknown as { plugins?: { getPlugin?: (id: string) => unknown } }).plugins;
+  if (!plugins?.getPlugin) return null;
+  for (const id of OBSIDGET_PLUGIN_IDS) {
+    const p = plugins.getPlugin(id);
+    if (p) return p;
+  }
+  return null;
 };
 
 const loadStoredData = async (plugin: WebOSPlugin) => {
   return (await plugin.loadData()) as WebOSData | null;
 };
 
-export const createBridge = (plugin: WebOSPlugin): WebOSAPI => ({
+export interface BridgeOptions {
+  /** État courant en mémoire (Desktop). Utilisé par saveWidgetState pour ne pas écraser items/config avec un state disque obsolète (ex. Jukebox enregistre ses paramètres après un déplacement). */
+  getCurrentState?: () => WebOSData | null;
+}
+
+export const createBridge = (plugin: WebOSPlugin, options?: BridgeOptions): WebOSAPI => ({
   async listVaultTree() {
     const root = plugin.app.vault.getRoot();
     const tree = buildTree(plugin, root);
@@ -187,12 +198,17 @@ export const createBridge = (plugin: WebOSPlugin): WebOSAPI => ({
   },
 
   async getFiles(extension?: string) {
-    let files = plugin.app.vault.getFiles();
-    if (extension) {
-      const ext = extension.replace('.', '');
-      files = files.filter((file) => file.extension === ext);
+    try {
+      let files = plugin.app.vault.getFiles();
+      if (!files || !Array.isArray(files)) return [];
+      if (extension) {
+        const ext = extension.replace('.', '');
+        files = files.filter((file) => file.extension === ext);
+      }
+      return files.map((file) => normalizePath(file.path));
+    } catch {
+      return [];
     }
-    return files.map((file) => normalizePath(file.path));
   },
 
   async loadWidgetState(id: string) {
@@ -201,16 +217,26 @@ export const createBridge = (plugin: WebOSPlugin): WebOSAPI => ({
   },
 
   async saveWidgetState(id: string, data: unknown) {
+    const inMemory = options?.getCurrentState?.();
+    const fromDisk = await loadStoredData(plugin);
     const stored =
-      (await loadStoredData(plugin)) ??
+      inMemory ??
+      fromDisk ??
       ({
         items: [],
         config: { barPosition: 'bottom', wallpaper: '', viewMode: 'desktop', theme: 'dark' },
         windows: []
       } as WebOSData);
-    const widgetState = { ...(stored.widgetState ?? {}) };
-    widgetState[id] = data;
+    const widgetState = { ...(fromDisk?.widgetState ?? stored.widgetState ?? {}), [id]: data };
     await plugin.saveData({ ...stored, widgetState });
+  },
+
+  showNotice(message: string, duration?: number) {
+    if (duration != null) {
+      new Notice(message, duration);
+    } else {
+      new Notice(message);
+    }
   }
 });
 

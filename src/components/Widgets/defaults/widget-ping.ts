@@ -6,10 +6,10 @@ export const defaultWidgetPing: WebOSWidgetItem = {
   type: 'widget',
   title: 'Ping Radar',
   widgetId: 'widget-ping',
-  cols: 2,
-  rows: 2,
+  cols: 3,
+  rows: 3,
   bgColor: '#064e3b',
-  html: `<div class="relative flex flex-col items-center justify-center h-full bg-black overflow-hidden">
+  html: `<div class="relative flex flex-col items-center justify-center h-full min-h-0 bg-black overflow-hidden box-border">
     
     <div class="absolute inset-0 border border-green-900 rounded-full m-2 opacity-50"></div>
     <div class="absolute inset-0 border border-green-900 rounded-full m-6 opacity-50"></div>
@@ -30,6 +30,6 @@ const inv = setInterval(() => {
     el.style.color = ms > 100 ? '#ef4444' : '#4ade80';
 }, 1000);
 container._cleanup = () => clearInterval(inv);`,
-  x: 9,
-  y: 10
+  x: 7,
+  y: 5
 };
