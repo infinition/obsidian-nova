@@ -149,7 +149,7 @@ const DEFAULT_CONFIG: WebOSConfig = {
   pageDotsBlurBubble: true,
   uiScale: 1,
   widgetScale: 1,
-  gridSize: 36,
+  gridSize: 44,
   pageUpDownChangesGridDensity: false,
   debugWidgetDimensions: false
 };
