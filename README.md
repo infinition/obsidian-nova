@@ -1,3 +1,5 @@
+<img width="138" height="134" alt="logo" src="https://github.com/user-attachments/assets/12a49e1a-47d8-47a6-b40e-784c6d2e56e4" />
+
 # Obsidian Nova
 
 A desktop-style interface for Obsidian: grid-based layout, widgets, apps, multiple pages, and full keyboard control. Built for power users who want a hacker-friendly dashboard inside their vault.
