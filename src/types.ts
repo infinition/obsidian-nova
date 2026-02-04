@@ -125,5 +125,7 @@ export interface WebOSAPI {
   getFiles(extension?: string): Promise<string[]>;
   loadWidgetState(id: string): Promise<unknown | null>;
   saveWidgetState(id: string, data: unknown): Promise<void>;
+  requestResize(id: string, cols: number, rows: number): void;
+  getGridInfo(): { gridCols: number; gridRowHeight: number; gap: number };
 }
 

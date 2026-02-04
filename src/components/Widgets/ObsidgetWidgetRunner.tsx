@@ -93,7 +93,7 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
 
     if (!isSame) {
       const styleEl = document.createElement('style');
-      styleEl.textContent = `:host { display: block; position: relative; width: 100%; box-sizing: border-box; } ${css || ''}`;
+      styleEl.textContent = `:host { display: block; position: relative; width: 100%; height: 100%; box-sizing: border-box; } [data-root="widget-root"] { width: 100%; height: 100%; } ${css || ''}`;
       shadow.appendChild(styleEl);
 
       rootElement.innerHTML = (html || '') + '<slot></slot>';
@@ -233,13 +233,24 @@ export const ObsidgetWidgetRunner: React.FC<ObsidgetWidgetRunnerProps> = ({
         const newBlockContent = isLinked
           ? `${finalSections[0].trim()}\n---\n---\n---\n${finalSections[3].trim()}\n`
           : [
-              finalSections[0].trim(),
-              finalSections[1].trim(),
-              finalSections[2].trim(),
-              finalSections[3].trim()
-            ].join('\n---\n') + '\n';
+            finalSections[0].trim(),
+            finalSections[1].trim(),
+            finalSections[2].trim(),
+            finalSections[3].trim()
+          ].join('\n---\n') + '\n';
         const updated = content.replace(match[0], prefix + newBlockContent);
         await api.writeFile(targetPath, updated);
+      },
+      requestResize: (cols: number, rows: number) => {
+        if (api.requestResize) {
+          api.requestResize(instanceId, cols, rows);
+        }
+      },
+      getGridInfo: () => {
+        if (api.getGridInfo) {
+          return api.getGridInfo();
+        }
+        return { gridCols: 20, gridRowHeight: 60, gap: 16 }; // Fallback
       }
     };
 

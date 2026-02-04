@@ -36,6 +36,8 @@ import { TodoWidget } from './Widgets/TodoWidget';
 import { WidgetRunner } from './Widgets/WidgetRunner';
 import { WIDGET_TEMPLATES } from './Widgets/templates';
 
+const GRID_GAP = 16;
+
 const WALLPAPERS = [
   'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=2070&q=80',
   'https://images.unsplash.com/photo-1477346611705-65d1883cee1e?auto=format&fit=crop&w=2070&q=80',
@@ -132,6 +134,36 @@ const DEFAULT_CONFIG: WebOSConfig = {
 const templateById = (id: string, templates: WebOSWidgetTemplate[]) =>
   templates.find((template) => template.id === id);
 
+const parseSizeFromCss = (css: string, gridCols: number, gridRowHeight: number, gap: number) => {
+  let cols = 2;
+  let rows = 2;
+  if (!css) return { cols, rows };
+
+  // Improved regex to find width/height or min-width/min-height in px, handling various spacings and units
+  const widthMatch = css.match(/(?:min-)?width\s*:\s*(\d+)(?:px|rem|em|%)/i);
+  const heightMatch = css.match(/(?:min-)?height\s*:\s*(\d+)(?:px|rem|em|%)/i);
+
+  if (widthMatch) {
+    const val = parseInt(widthMatch[1], 10);
+    const unit = widthMatch[0].toLowerCase().includes('px') ? 'px' : 'other';
+    if (unit === 'px') {
+      const estimatedCols = Math.round((val + gap) / (gridRowHeight + gap));
+      cols = Math.max(1, Math.min(estimatedCols, gridCols));
+    }
+  }
+
+  if (heightMatch) {
+    const val = parseInt(heightMatch[1], 10);
+    const unit = heightMatch[0].toLowerCase().includes('px') ? 'px' : 'other';
+    if (unit === 'px') {
+      const estimatedRows = Math.round((val + gap) / (gridRowHeight + gap));
+      rows = Math.max(1, estimatedRows);
+    }
+  }
+
+  return { cols, rows };
+};
+
 const buildWidgetItem = (
   templateId: string,
   overrides: Partial<WebOSWidgetItem>,
@@ -151,13 +183,23 @@ const buildWidgetItem = (
   }
 
   const isObsidget = template.source === 'obsidget';
+
+  // If it's an obsidget and we have CSS but no explicit cols/rows in template, try to parse from CSS
+  let defaultCols = template.cols;
+  let defaultRows = template.rows;
+
+  if (isObsidget && template.css && (!template.cols || !template.rows)) {
+    // Note: gridCols and gridRowHeight are not easily accessible here without passing them down
+    // But usually templates have explicit cols/rows now or we use defaults
+  }
+
   return {
     id: overrides.id || templateId,
     type: 'widget',
     title: overrides.title || template.title,
     widgetId: template.id,
-    cols: overrides.cols ?? template.cols,
-    rows: overrides.rows ?? template.rows,
+    cols: overrides.cols ?? defaultCols,
+    rows: overrides.rows ?? defaultRows,
     bgColor: overrides.bgColor ?? template.bgColor,
     html: isObsidget ? undefined : template.html,
     css: isObsidget ? undefined : template.css,
@@ -763,10 +805,26 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const [resizeHandle, setResizeHandle] = useState<ResizeHandle | null>(null);
 
   const zIndexCounter = useRef(100);
-  const dragItemRef = useRef<WebOSItem | null>(null);
-  const longPressTimer = useRef<number | null>(null);
-  const backgroundLongPressTimer = useRef<number | null>(null);
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
+
+  const extendedApi = useMemo<WebOSAPI>(() => ({
+    ...api,
+    requestResize: (id: string, cols: number, rows: number) => {
+      setItems(prev => prev.map(item => {
+        if (item.id === id) {
+          return { ...item, cols, rows };
+        }
+        return item;
+      }));
+      // Also resolve overlaps if needed
+      setTimeout(() => resolveOverlapsAfterResize(id), 0);
+    },
+    getGridInfo: () => ({
+      gridCols,
+      gridRowHeight,
+      gap: GRID_GAP
+    })
+  }), [api, gridCols, gridRowHeight]);
   const modifierDragRef = useRef(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const pageFlipTimer = useRef<number | null>(null);
@@ -1066,18 +1124,32 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       if (!active) return;
       if (settings) setObsidgetSettings(settings);
       if (!gallery || gallery.length === 0) return;
-      const mapped = (gallery as Array<Record<string, unknown>>).map((entry) => ({
-        id: String(entry.id || entry.name || `obsidget-${Math.random()}`),
-        title: String(entry.name || entry.id || 'Widget'),
-        cols: 2,
-        rows: 2,
-        bgColor: '#1f2937',
-        kind: 'runner' as const,
-        html: typeof entry.html === 'string' ? entry.html : '',
-        css: typeof entry.css === 'string' ? entry.css : '',
-        js: typeof entry.js === 'string' ? entry.js : '',
-        source: 'obsidget' as const
-      }));
+      const mapped = (gallery as Array<Record<string, unknown>>).map((entry) => {
+        const template = {
+          id: String(entry.id || entry.name || `obsidget-${Math.random()}`),
+          title: String(entry.name || entry.id || 'Widget'),
+          cols: typeof entry.cols === 'number' ? entry.cols : 2,
+          rows: typeof entry.rows === 'number' ? entry.rows : 2,
+          minCols: typeof entry.minCols === 'number' ? entry.minCols : 1,
+          minRows: typeof entry.minRows === 'number' ? entry.minRows : 1,
+          bgColor: '#1f2937',
+          kind: 'runner' as const,
+          html: typeof entry.html === 'string' ? entry.html : '',
+          css: typeof entry.css === 'string' ? entry.css : '',
+          js: typeof entry.js === 'string' ? entry.js : '',
+          source: 'obsidget' as const
+        };
+
+        // Dynamic size detection from CSS if cols/rows not explicitly set
+        if (typeof entry.cols !== 'number' || typeof entry.rows !== 'number') {
+          const css = typeof entry.css === 'string' ? entry.css : '';
+          const { cols, rows } = parseSizeFromCss(css, gridCols, gridRowHeight, GRID_GAP);
+          if (typeof entry.cols !== 'number') template.cols = cols;
+          if (typeof entry.rows !== 'number') template.rows = rows;
+        }
+        return template;
+      });
+
       setWidgetTemplates((prev) => {
         const map = new Map(prev.map((template) => [template.id, template]));
         mapped.forEach((template) => {
@@ -1090,7 +1162,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     return () => {
       active = false;
     };
-  }, [api]);
+  }, [api, gridCols, gridRowHeight]);
 
   useEffect(() => {
     if (!config.wallpaper || isRemotePath(config.wallpaper)) return;
@@ -1213,7 +1285,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   );
 
   const isWidgetInteractionRef = useRef(false);
-  const isPageNavBlocked = false; 
+  const isPageNavBlocked = false;
 
   // ... (Keyboard, wheel, drag/drop handlers unchanged)
   useEffect(() => {
@@ -1268,7 +1340,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           return;
         }
       }
-        
+
       if (showSettings || showWidgetGallery || showPages) return;
       if (isWidgetInteractionRef.current) return;
       const activeEl = document.activeElement;
@@ -1318,7 +1390,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       if (isEditing || showSettings || showWidgetGallery || showPages) return;
       if (isWidgetInteractionRef.current) return;
       if (event.target instanceof Element && (event.target.closest('[data-widget]') || event.target.closest('[data-window]'))) return;
-        
+
       if (Math.abs(event.deltaX) < 20 && Math.abs(event.deltaY) < 20) return;
       if (wheelLockRef.current) return;
       pageCreationBudgetRef.current = 1;
@@ -1349,23 +1421,23 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   // ... (PixelToGrid, styles, drag logic unchanged)
   const pixelsToGrid = useCallback(
     (x: number, y: number, rect: DOMRect) => {
-      const gap = 16;
-      const colWidth = (rect.width - gap * (gridCols - 1)) / gridCols;
-      const gridX = Math.floor((x - rect.left) / (colWidth + gap)) + 1;
-      const gridY = Math.floor((y - rect.top) / (gridRowHeight + 24)) + 1;
+      const colWidth = (rect.width - GRID_GAP * (gridCols - 1)) / gridCols;
+      const gridX = Math.floor((x - rect.left + GRID_GAP / 2) / (colWidth + GRID_GAP)) + 1;
+      const gridY = Math.floor((y - rect.top + GRID_GAP / 2) / (gridRowHeight + GRID_GAP)) + 1;
       return {
         x: Math.max(1, Math.min(gridX, gridCols)),
         y: Math.max(1, gridY)
       };
     },
-    [gridCols, gridRowHeight]
+    [gridCols, gridRowHeight, GRID_GAP]
   );
 
   const getItemStyle = (item: WebOSItem) => {
     const layout = !item.x || !item.y ? layoutOverrides.get(item.id) : undefined;
     const style: React.CSSProperties = {
       gridColumnEnd: `span ${item.cols || 1}`,
-      gridRowEnd: `span ${item.rows || 1}`
+      gridRowEnd: `span ${item.rows || 1}`,
+      gap: `${GRID_GAP}px`
     };
     let x = layout?.x ?? item.x;
     let y = layout?.y ?? item.y;
@@ -1389,11 +1461,11 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const findFreeSlot = (cols: number, rows: number) => {
+  const findFreeSlot = (cols: number, rows: number, pageIndex: number = currentPageId) => {
     for (let y = 1; y <= 10; y += 1) {
       for (let x = 1; x <= gridCols - cols + 1; x += 1) {
         const overlaps = items.some((item) => {
-          if ((item.pageIndex ?? 0) !== currentPageId) return false;
+          if ((item.pageIndex ?? 0) !== pageIndex) return false;
           if (!item.x || !item.y) return false;
           const width = item.cols || 1;
           const height = item.rows || 1;
@@ -1402,7 +1474,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         if (!overlaps) return { x, y };
       }
     }
-    return { x: 1, y: 1 };
+    return null;
   };
 
   const findFreeSlotForItems = (
@@ -1641,29 +1713,82 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       event.preventDefault();
       const diffX = event.clientX - resizeHandle.startX;
       const diffY = event.clientY - resizeHandle.startY;
-      const colDiff = Math.round(diffX / gridRowHeight);
-      const rowDiff = Math.round(diffY / gridRowHeight);
-      const rawCols = Math.max(1, resizeHandle.startCols + colDiff);
-      const rawRows = Math.max(1, resizeHandle.startRows + rowDiff);
+      const rect = gridRef.current?.getBoundingClientRect();
+      const colWidth = rect ? (rect.width - GRID_GAP * (gridCols - 1)) / gridCols : gridRowHeight;
+      const colDiff = Math.round(diffX / (colWidth + GRID_GAP));
+      const rowDiff = Math.round(diffY / (gridRowHeight + GRID_GAP));
+
       const resizedItem = items.find((item) => item.id === resizeHandle.id);
       if (resizedItem?.x && resizedItem?.y) {
-        const maxCols = Math.max(1, gridCols - resizedItem.x + 1);
-        const newCols = Math.min(rawCols, maxCols);
-        const newRows = rawRows;
-        const overlaps = items.some((item) => {
-          if (item.id === resizeHandle.id) return false;
-          if ((item.pageIndex ?? 0) !== (resizedItem.pageIndex ?? 0)) return false;
-          if (!item.x || !item.y) return false;
-          const w = item.cols || 1;
-          const h = item.rows || 1;
-          return !(
-            item.x + w <= resizedItem.x! ||
-            resizedItem.x! + newCols <= item.x ||
-            item.y + h <= resizedItem.y! ||
-            resizedItem.y! + newRows <= item.y
-          );
-        });
-        if (!overlaps && (newCols !== resizeHandle.currentCols || newRows !== resizeHandle.currentRows)) {
+        const minCols = resizedItem.minCols || 1;
+        const minRows = resizedItem.minRows || 1;
+
+        let targetCols = Math.max(minCols, resizeHandle.startCols + colDiff);
+        let targetRows = Math.max(minRows, resizeHandle.startRows + rowDiff);
+
+        const maxCols = Math.max(minCols, gridCols - resizedItem.x + 1);
+        targetCols = Math.min(targetCols, maxCols);
+
+        // Soft constraints: try to find the largest valid size up to target
+        let newCols = resizeHandle.currentCols;
+        let newRows = resizeHandle.currentRows;
+
+        // Try to reach targetCols/targetRows
+        // We check if we can resize to target, if not we back off
+        const checkOverlap = (c: number, r: number) => {
+          return items.some((item) => {
+            if (item.id === resizeHandle.id) return false;
+            if ((item.pageIndex ?? 0) !== (resizedItem.pageIndex ?? 0)) return false;
+            if (!item.x || !item.y) return false;
+            const w = item.cols || 1;
+            const h = item.rows || 1;
+            return !(
+              item.x + w <= resizedItem.x! ||
+              resizedItem.x! + c <= item.x ||
+              item.y + h <= resizedItem.y! ||
+              resizedItem.y! + r <= item.y
+            );
+          });
+        };
+
+        // Determine direction of resize
+        const stepCol = targetCols > resizeHandle.currentCols ? 1 : -1;
+        const stepRow = targetRows > resizeHandle.currentRows ? 1 : -1;
+
+        // Simple approach: try target, if fail, keep current (or try intermediate?)
+        // Better: iterate from current to target. The last valid one is the result.
+
+        // Cols
+        if (targetCols !== resizeHandle.currentCols) {
+          let validCols = resizeHandle.currentCols;
+          const range = Math.abs(targetCols - resizeHandle.currentCols);
+          for (let i = 1; i <= range; i++) {
+            const test = resizeHandle.currentCols + (i * stepCol);
+            if (!checkOverlap(test, resizeHandle.currentRows)) {
+              validCols = test;
+            } else {
+              break; // Blocked
+            }
+          }
+          newCols = validCols;
+        }
+
+        // Rows (check with newCols)
+        if (targetRows !== resizeHandle.currentRows) {
+          let validRows = resizeHandle.currentRows;
+          const range = Math.abs(targetRows - resizeHandle.currentRows);
+          for (let i = 1; i <= range; i++) {
+            const test = resizeHandle.currentRows + (i * stepRow);
+            if (!checkOverlap(newCols, test)) {
+              validRows = test;
+            } else {
+              break; // Blocked
+            }
+          }
+          newRows = validRows;
+        }
+
+        if (newCols !== resizeHandle.currentCols || newRows !== resizeHandle.currentRows) {
           updateItem(resizeHandle.id, { cols: newCols, rows: newRows });
           setResizeHandle({ ...resizeHandle, currentCols: newCols, currentRows: newRows });
         }
@@ -1747,13 +1872,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       const nextPreview =
         overlapTarget && draggedX && draggedY
           ? {
-              targetId: overlapTarget.id,
-              targetPos: {
-                x: overlapTarget.x ?? layoutOverrides.get(overlapTarget.id)?.x ?? 0,
-                y: overlapTarget.y ?? layoutOverrides.get(overlapTarget.id)?.y ?? 0
-              },
-              draggedPos: { x: draggedX, y: draggedY }
-            }
+            targetId: overlapTarget.id,
+            targetPos: {
+              x: overlapTarget.x ?? layoutOverrides.get(overlapTarget.id)?.x ?? 0,
+              y: overlapTarget.y ?? layoutOverrides.get(overlapTarget.id)?.y ?? 0
+            },
+            draggedPos: { x: draggedX, y: draggedY }
+          }
           : null;
 
       setSwapPreview((prev) => {
@@ -1868,17 +1993,50 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           const itemX = event.clientX - dragOffset.x;
           const itemY = event.clientY - dragOffset.y;
           const { x, y } = pixelsToGrid(itemX, itemY, rect);
-          const colliding = items.find(
-            (item) => item.id !== draggingId && (item.pageIndex ?? 0) === currentPageId && item.x === x && item.y === y
-          );
-          if (colliding) {
-            const draggedItem = items.find((item) => item.id === draggingId);
-            if (draggedItem) {
+
+          const draggedItem = items.find((item) => item.id === draggingId);
+          if (draggedItem) {
+            const dw = draggedItem.cols || 1;
+            const dh = draggedItem.rows || 1;
+
+            // Find if we are dropping over another item (any part of it)
+            const colliding = items.find((item) => {
+              if (item.id === draggingId) return false;
+              if ((item.pageIndex ?? 0) !== currentPageId) return false;
+              const ix = item.x ?? layoutOverrides.get(item.id)?.x;
+              const iy = item.y ?? layoutOverrides.get(item.id)?.y;
+              if (!ix || !iy) return false;
+              const iw = item.cols || 1;
+              const ih = item.rows || 1;
+
+              // Standard AABB overlap check
+              return !(
+                ix + iw <= x ||
+                x + dw <= ix ||
+                iy + ih <= y ||
+                y + dh <= iy
+              );
+            });
+
+            if (colliding && colliding.x && colliding.y) {
+              // Swap logic: move colliding item to dragged item's original position
+              // and dragged item to new position
+              const oldX = draggedItem.x;
+              const oldY = draggedItem.y;
+              const oldPage = draggedItem.pageIndex ?? 0;
+
+              setItems((prev) => prev.map((item) => {
+                if (item.id === draggingId) {
+                  return { ...item, x, y, pageIndex: currentPageId };
+                }
+                if (item.id === colliding.id) {
+                  return { ...item, x: oldX, y: oldY, pageIndex: oldPage };
+                }
+                return item;
+              }));
+            } else {
               updateItem(draggingId, { x, y, pageIndex: currentPageId });
-              updateItem(colliding.id, { x: draggedItem.x, y: draggedItem.y, pageIndex: currentPageId });
             }
-          } else {
-            updateItem(draggingId, { x, y, pageIndex: currentPageId });
           }
         }
       }
@@ -1892,7 +2050,48 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
 
   const addWidget = (template: WebOSWidgetTemplate) => {
     const id = `widget-${Date.now()}`;
-    const { x, y } = findFreeSlot(template.cols, template.rows);
+
+    // Smart insertion: try current page, then next pages, then create new
+    let targetPage = currentPageId;
+    let slot = findFreeSlot(template.cols, template.rows, targetPage);
+
+    if (!slot) {
+      // Try existing pages
+      const sortedPages = [...pages].sort((a, b) => a - b);
+      const currentIndex = sortedPages.indexOf(currentPageId);
+
+      for (let i = currentIndex + 1; i < sortedPages.length; i++) {
+        const p = sortedPages[i];
+        slot = findFreeSlot(template.cols, template.rows, p);
+        if (slot) {
+          targetPage = p;
+          break;
+        }
+      }
+    }
+
+    if (!slot) {
+      // Create new page
+      const nextId = Math.max(...pages) + 1;
+      const nextOrder = [...pages, nextId];
+      // Place new page to the right of the last one
+      const lastPageCoord = getPageCoord(pages[pages.length - 1] || 0);
+      const newPageCoord = { x: lastPageCoord.x + 1, y: lastPageCoord.y };
+
+      setConfig((prev) => ({
+        ...prev,
+        pageOrder: nextOrder,
+        pageCoords: { ...(prev.pageCoords ?? {}), [nextId]: newPageCoord }
+      }));
+
+      targetPage = nextId;
+      slot = { x: 1, y: 1 }; // New page is empty
+    }
+
+    if (targetPage !== currentPageId) {
+      setCurrentPageId(targetPage);
+    }
+
     const newItem: WebOSWidgetItem = {
       id,
       type: 'widget',
@@ -1904,9 +2103,9 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       html: template.source === 'obsidget' ? undefined : template.html,
       css: template.source === 'obsidget' ? undefined : template.css,
       js: template.source === 'obsidget' ? undefined : template.js,
-      x,
-      y,
-      pageIndex: currentPageId
+      x: slot.x,
+      y: slot.y,
+      pageIndex: targetPage
     };
     setItems((prev) => [...prev, newItem]);
     setShowWidgetGallery(false);
@@ -1915,7 +2114,42 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
   const addWidgetFromItem = (item: WebOSWidgetItem) => {
     const cols = item.cols ?? 1;
     const rows = item.rows ?? 1;
-    const { x, y } = findFreeSlot(cols, rows);
+
+    let targetPage = currentPageId;
+    let slot = findFreeSlot(cols, rows, targetPage);
+
+    if (!slot) {
+      const sortedPages = [...pages].sort((a, b) => a - b);
+      const currentIndex = sortedPages.indexOf(currentPageId);
+      for (let i = currentIndex + 1; i < sortedPages.length; i++) {
+        const p = sortedPages[i];
+        slot = findFreeSlot(cols, rows, p);
+        if (slot) {
+          targetPage = p;
+          break;
+        }
+      }
+    }
+
+    if (!slot) {
+      const nextId = Math.max(...pages) + 1;
+      const nextOrder = [...pages, nextId];
+      const lastPageCoord = getPageCoord(pages[pages.length - 1] || 0);
+      const newPageCoord = { x: lastPageCoord.x + 1, y: lastPageCoord.y };
+
+      setConfig((prev) => ({
+        ...prev,
+        pageOrder: nextOrder,
+        pageCoords: { ...(prev.pageCoords ?? {}), [nextId]: newPageCoord }
+      }));
+      targetPage = nextId;
+      slot = { x: 1, y: 1 };
+    }
+
+    if (targetPage !== currentPageId) {
+      setCurrentPageId(targetPage);
+    }
+
     const newItem: WebOSWidgetItem = {
       id: `widget-${Date.now()}`,
       type: 'widget',
@@ -1927,9 +2161,9 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       html: item.html,
       css: item.css,
       js: item.js,
-      x,
-      y,
-      pageIndex: currentPageId
+      x: slot.x,
+      y: slot.y,
+      pageIndex: targetPage
     };
     setItems((prev) => [...prev, newItem]);
     setShowWidgetGallery(false);
@@ -1956,6 +2190,19 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       const place = (item: WebOSItem) => {
         const cols = item.cols || 1;
         const rows = item.rows || 1;
+        // Search for nearest free slot instead of resetting to 1,1
+        let bestX = 1;
+        let bestY = 1;
+        let minDist = Infinity;
+
+        // Search radius (limited to avoid perf issues)
+        const startX = Math.max(1, (item.x || 1) - 4);
+        const endX = Math.min(gridCols - cols + 1, (item.x || 1) + 4);
+        const startY = Math.max(1, (item.y || 1) - 4);
+        const endY = Math.min(10, (item.y || 1) + 4);
+
+        // First try the full grid if local search fails, but prioritize local
+        // Actually, just iterating the whole grid is fine for 10x16
         for (let y = 1; y <= 10; y += 1) {
           for (let x = 1; x <= gridCols - cols + 1; x += 1) {
             const overlaps = occupied.some((cell) => {
@@ -1967,13 +2214,17 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               );
             });
             if (!overlaps) {
-              occupied.push({ x, y, w: cols, h: rows });
-              overrides.set(item.id, { x, y });
-              return;
+              const dist = Math.abs(x - (item.x || 1)) + Math.abs(y - (item.y || 1));
+              if (dist < minDist) {
+                minDist = dist;
+                bestX = x;
+                bestY = y;
+              }
             }
           }
         }
-        overrides.set(item.id, { x: 1, y: 1 });
+        occupied.push({ x: bestX, y: bestY, w: cols, h: rows });
+        overrides.set(item.id, { x: bestX, y: bestY });
       };
       sorted.forEach((item) => {
         const x = item.x ?? 1;
@@ -2039,7 +2290,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     },
     [setPageDragOffsetRaf]
   );
-  
+
   const handleTouchStart = (event: React.TouchEvent) => {
     if (showSettings || showWidgetGallery || showPages) return;
     const isSwipeBlockedTarget = (target: EventTarget | null) => {
@@ -2130,17 +2381,17 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     const dragOffset = pageDragOffsetRef.current;
     if (isPageDragging) {
       let snapped = false;
-        if (Math.abs(dragOffset.x) >= 30 && Math.abs(dragOffset.x) >= Math.abs(dragOffset.y)) {
-          const dirX = dragOffset.x < 0 ? 1 : -1;
-          snapped = movePageBy(dirX, 0);
-          schedulePageSnap({ x: dragOffset.x + dirX * 100, y: dragOffset.y });
-        } else if (Math.abs(dragOffset.y) >= 30 && Math.abs(dragOffset.y) >= Math.abs(dragOffset.x)) {
-          if (!config.lockVerticalSwipe) {
-            const dirY = dragOffset.y < 0 ? 1 : -1;
-            snapped = movePageBy(0, dirY);
-            schedulePageSnap({ x: dragOffset.x, y: dragOffset.y + dirY * 100 });
-          }
+      if (Math.abs(dragOffset.x) >= 30 && Math.abs(dragOffset.x) >= Math.abs(dragOffset.y)) {
+        const dirX = dragOffset.x < 0 ? 1 : -1;
+        snapped = movePageBy(dirX, 0);
+        schedulePageSnap({ x: dragOffset.x + dirX * 100, y: dragOffset.y });
+      } else if (Math.abs(dragOffset.y) >= 30 && Math.abs(dragOffset.y) >= Math.abs(dragOffset.x)) {
+        if (!config.lockVerticalSwipe) {
+          const dirY = dragOffset.y < 0 ? 1 : -1;
+          snapped = movePageBy(0, dirY);
+          schedulePageSnap({ x: dragOffset.x, y: dragOffset.y + dirY * 100 });
         }
+      }
       if (!snapped) {
         schedulePageSnap({ x: dragOffset.x, y: dragOffset.y });
       }
@@ -2166,8 +2417,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     const js = item.js ?? template?.js;
     const isObsidget = template?.source === 'obsidget';
 
-    if (item.widgetId === 'quick-note') return <QuickNoteWidget api={api} />;
-    if (item.widgetId === 'todo') return <TodoWidget api={api} />;
+    if (item.widgetId === 'quick-note') return <QuickNoteWidget api={extendedApi} />;
+    if (item.widgetId === 'todo') return <TodoWidget api={extendedApi} />;
     if (!html && !css && !js && !isObsidget) {
       return (
         <div className="w-full h-full flex items-center justify-center text-xs text-white/60">
@@ -2184,7 +2435,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           css={css}
           js={js}
           isEditing={editing}
-          api={api}
+          api={extendedApi}
           maxWidth={obsidgetMaxWidth}
         />
       );
@@ -2269,16 +2520,16 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     if (win.kind === 'finder') {
       return (
         <div className={`h-full w-full flex flex-col overflow-hidden ${currentTheme.folder} ${currentTheme.text}`}>
-            <FinderView
-                api={api}
-                onOpenImage={(path) =>
-                    openWindowForItem({ id: `${path}-img`, title: path, type: 'app' } as WebOSItem, {
-                    kind: 'image',
-                    title: path.split('/').pop() || 'Image',
-                    path
-                    })
-                }
-            />
+          <FinderView
+            api={api}
+            onOpenImage={(path) =>
+              openWindowForItem({ id: `${path}-img`, title: path, type: 'app' } as WebOSItem, {
+                kind: 'image',
+                title: path.split('/').pop() || 'Image',
+                path
+              })
+            }
+          />
         </div>
       );
     }
@@ -2347,8 +2598,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         data-id={item.id}
         data-widget={isWidget ? 'true' : undefined}
         onClick={(event) => {
-            if (isEditing) return;
-            launchItem(item);
+          if (isEditing) return;
+          launchItem(item);
         }}
         onPointerEnter={() => {
           if (isWidget) isWidgetInteractionRef.current = true;
@@ -2407,9 +2658,9 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             style={
               item.bgColor !== 'glass'
                 ? {
-                    backgroundColor: item.fullSize ? 'transparent' : item.bgColor,
-                    border: undefined
-                  }
+                  backgroundColor: item.fullSize ? 'transparent' : item.bgColor,
+                  border: undefined
+                }
                 : {}
             }
           >
@@ -2482,7 +2733,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       </div>
     );
   };
-  
+
   const SettingsModal = () => {
     if (!showSettings) return null;
     const [visibleImageCount, setVisibleImageCount] = useState(24);
@@ -2507,13 +2758,12 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               <h3 className={`text-xl font-bold ${currentTheme.text}`}>Réglages</h3>
               <p className={`text-xs mt-1 ${currentTheme.textMuted}`}>Personnalisez votre expérience</p>
             </div>
-            
+
             <nav className="flex-1 px-3 space-y-1">
               <button
                 onClick={() => setSettingsTab('general')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  settingsTab === 'general' ? 'bg-white/10 text-white' : `${currentTheme.hover} ${currentTheme.textMuted}`
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${settingsTab === 'general' ? 'bg-white/10 text-white' : `${currentTheme.hover} ${currentTheme.textMuted}`
+                  }`}
                 style={settingsTab === 'general' ? { backgroundColor: currentTheme.accent } : {}}
               >
                 <Sliders size={18} />
@@ -2521,9 +2771,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               </button>
               <button
                 onClick={() => setSettingsTab('appearance')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  settingsTab === 'appearance' ? 'bg-white/10 text-white' : `${currentTheme.hover} ${currentTheme.textMuted}`
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${settingsTab === 'appearance' ? 'bg-white/10 text-white' : `${currentTheme.hover} ${currentTheme.textMuted}`
+                  }`}
                 style={settingsTab === 'appearance' ? { backgroundColor: currentTheme.accent } : {}}
               >
                 <Palette size={18} />
@@ -2531,10 +2780,9 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               </button>
               <button
                 onClick={() => setSettingsTab('wallpapers')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                    settingsTab === 'wallpapers' ? 'bg-white/10 text-white' : `${currentTheme.hover} ${currentTheme.textMuted}`
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${settingsTab === 'wallpapers' ? 'bg-white/10 text-white' : `${currentTheme.hover} ${currentTheme.textMuted}`
                   }`}
-                  style={settingsTab === 'wallpapers' ? { backgroundColor: currentTheme.accent } : {}}
+                style={settingsTab === 'wallpapers' ? { backgroundColor: currentTheme.accent } : {}}
               >
                 <ImageIcon size={18} />
                 Fonds d'écran
@@ -2542,363 +2790,353 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             </nav>
 
             <div className={`p-4 border-t ${currentTheme.border}`}>
-                <button 
-                    onClick={() => setShowSettings(false)} 
-                    className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-semibold transition ${currentTheme.textMuted}`}
-                >
-                    Fermer
-                </button>
+              <button
+                onClick={() => setShowSettings(false)}
+                className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-semibold transition ${currentTheme.textMuted}`}
+              >
+                Fermer
+              </button>
             </div>
           </div>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-            
+
             {/* Général */}
             {settingsTab === 'general' && (
               <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
                 <section>
-                    <h4 className={`text-sm uppercase tracking-wider font-bold mb-4 ${currentTheme.textMuted}`}>Affichage & Navigation</h4>
-                    
-                    <div className="space-y-4">
-                        <div className={`rounded-xl p-4 border flex items-center justify-between ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                            <div>
-                                <div className={`font-medium mb-1 ${currentTheme.text}`}>Mode d'affichage</div>
-                                <div className={`text-xs ${currentTheme.textMuted}`}>Choisir entre une vue grille classique ou style bureau</div>
-                            </div>
-                            <div className="flex bg-black/40 p-1 rounded-lg">
-                                <button
-                                    onClick={() => setConfig((prev) => ({ ...prev, viewMode: 'grid' }))}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${
-                                    config.viewMode === 'grid' ? 'text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                                    }`}
-                                    style={config.viewMode === 'grid' ? { backgroundColor: currentTheme.accent } : {}}
-                                >
-                                    Grille
-                                </button>
-                                <button
-                                    onClick={() => setConfig((prev) => ({ ...prev, viewMode: 'desktop' }))}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${
-                                    config.viewMode === 'desktop' ? 'text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                                    }`}
-                                    style={config.viewMode === 'desktop' ? { backgroundColor: currentTheme.accent } : {}}
-                                >
-                                    Bureau
-                                </button>
-                            </div>
-                        </div>
+                  <h4 className={`text-sm uppercase tracking-wider font-bold mb-4 ${currentTheme.textMuted}`}>Affichage & Navigation</h4>
 
-                        <div className={`rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                            <div className={`font-medium mb-3 ${currentTheme.text}`}>Position de la barre des tâches</div>
-                            <div className="grid grid-cols-4 gap-2">
-                                {(['top', 'bottom', 'left', 'right'] as const).map((pos) => (
-                                    <button
-                                    key={pos}
-                                    onClick={() => setConfig((prev) => ({ ...prev, barPosition: pos }))}
-                                    className={`py-2 rounded-lg border capitalize text-sm transition ${
-                                        config.barPosition === pos ? 'text-white' : `border-white/10 bg-black/20 hover:bg-white/5 ${currentTheme.textMuted}`
-                                    }`}
-                                    style={config.barPosition === pos ? { backgroundColor: currentTheme.accent, borderColor: currentTheme.accent } : {}}
-                                    >
-                                    {pos}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className={`rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                             <div className="flex items-center justify-between mb-2">
-                                <span className={`font-medium ${currentTheme.text}`}>Sensibilité du swipe</span>
-                                <span className={`text-xs bg-black/40 px-2 py-1 rounded ${currentTheme.textMuted}`}>{config.swipeThreshold ?? 30}px</span>
-                             </div>
-                             <input
-                                type="range"
-                                min={15}
-                                max={80}
-                                step={1}
-                                value={config.swipeThreshold ?? 30}
-                                onChange={(event) =>
-                                setConfig((prev) => ({ ...prev, swipeThreshold: Number(event.target.value) }))
-                                }
-                                className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-current"
-                                style={{ color: currentTheme.accent }}
-                            />
-                            <div className={`text-[10px] mt-2 flex justify-between ${currentTheme.textMuted}`}>
-                                <span>Sensible</span>
-                                <span>Moins sensible</span>
-                            </div>
-                        </div>
-
-                        <div className={`flex items-center justify-between rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                            <div>
-                                <div className={`font-medium ${currentTheme.text}`}>Verrouillage swipe vertical</div>
-                                <div className={`text-xs ${currentTheme.textMuted}`}>Empêche de changer de page vers le haut/bas</div>
-                            </div>
-                            <button
-                                onClick={() => setConfig((prev) => ({...prev, lockVerticalSwipe: !prev.lockVerticalSwipe}))}
-                                className={`w-12 h-6 rounded-full transition-colors relative`}
-                                style={{ backgroundColor: config.lockVerticalSwipe ? currentTheme.accent : 'rgba(255,255,255,0.1)' }}
-                            >
-                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                                    config.lockVerticalSwipe ? 'translate-x-6' : 'translate-x-0'
-                                }`} />
-                            </button>
-                        </div>
+                  <div className="space-y-4">
+                    <div className={`rounded-xl p-4 border flex items-center justify-between ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                      <div>
+                        <div className={`font-medium mb-1 ${currentTheme.text}`}>Mode d'affichage</div>
+                        <div className={`text-xs ${currentTheme.textMuted}`}>Choisir entre une vue grille classique ou style bureau</div>
+                      </div>
+                      <div className="flex bg-black/40 p-1 rounded-lg">
+                        <button
+                          onClick={() => setConfig((prev) => ({ ...prev, viewMode: 'grid' }))}
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${config.viewMode === 'grid' ? 'text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                            }`}
+                          style={config.viewMode === 'grid' ? { backgroundColor: currentTheme.accent } : {}}
+                        >
+                          Grille
+                        </button>
+                        <button
+                          onClick={() => setConfig((prev) => ({ ...prev, viewMode: 'desktop' }))}
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${config.viewMode === 'desktop' ? 'text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                            }`}
+                          style={config.viewMode === 'desktop' ? { backgroundColor: currentTheme.accent } : {}}
+                        >
+                          Bureau
+                        </button>
+                      </div>
                     </div>
+
+                    <div className={`rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                      <div className={`font-medium mb-3 ${currentTheme.text}`}>Position de la barre des tâches</div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {(['top', 'bottom', 'left', 'right'] as const).map((pos) => (
+                          <button
+                            key={pos}
+                            onClick={() => setConfig((prev) => ({ ...prev, barPosition: pos }))}
+                            className={`py-2 rounded-lg border capitalize text-sm transition ${config.barPosition === pos ? 'text-white' : `border-white/10 bg-black/20 hover:bg-white/5 ${currentTheme.textMuted}`
+                              }`}
+                            style={config.barPosition === pos ? { backgroundColor: currentTheme.accent, borderColor: currentTheme.accent } : {}}
+                          >
+                            {pos}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className={`rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`font-medium ${currentTheme.text}`}>Sensibilité du swipe</span>
+                        <span className={`text-xs bg-black/40 px-2 py-1 rounded ${currentTheme.textMuted}`}>{config.swipeThreshold ?? 30}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={15}
+                        max={80}
+                        step={1}
+                        value={config.swipeThreshold ?? 30}
+                        onChange={(event) =>
+                          setConfig((prev) => ({ ...prev, swipeThreshold: Number(event.target.value) }))
+                        }
+                        className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-current"
+                        style={{ color: currentTheme.accent }}
+                      />
+                      <div className={`text-[10px] mt-2 flex justify-between ${currentTheme.textMuted}`}>
+                        <span>Sensible</span>
+                        <span>Moins sensible</span>
+                      </div>
+                    </div>
+
+                    <div className={`flex items-center justify-between rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                      <div>
+                        <div className={`font-medium ${currentTheme.text}`}>Verrouillage swipe vertical</div>
+                        <div className={`text-xs ${currentTheme.textMuted}`}>Empêche de changer de page vers le haut/bas</div>
+                      </div>
+                      <button
+                        onClick={() => setConfig((prev) => ({ ...prev, lockVerticalSwipe: !prev.lockVerticalSwipe }))}
+                        className={`w-12 h-6 rounded-full transition-colors relative`}
+                        style={{ backgroundColor: config.lockVerticalSwipe ? currentTheme.accent : 'rgba(255,255,255,0.1)' }}
+                      >
+                        <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${config.lockVerticalSwipe ? 'translate-x-6' : 'translate-x-0'
+                          }`} />
+                      </button>
+                    </div>
+                  </div>
                 </section>
               </div>
             )}
 
             {/* Apparence */}
             {settingsTab === 'appearance' && (
-               <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                 <section>
-                    <h4 className={`text-sm uppercase tracking-wider font-bold mb-4 ${currentTheme.textMuted}`}>Thème & Couleurs</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {Object.entries(THEMES).map(([key, theme]) => (
-                            <button
-                            key={key}
-                            onClick={() => setConfig((prev) => ({ ...prev, theme: key as WebOSConfig['theme'] }))}
-                            className={`group relative overflow-hidden rounded-xl border transition-all text-left p-4 ${
-                                config.theme === key ? 'ring-1' : `border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20`
-                            }`}
-                            style={config.theme === key ? { borderColor: theme.accent, backgroundColor: `${theme.accent}10`, ringColor: theme.accent } : {}}
-                            >
-                                <div className="flex items-center gap-4 relative z-10">
-                                    <div 
-                                        className="w-10 h-10 rounded-full shadow-lg border border-white/10"
-                                        style={{ backgroundColor: key === 'obsidian' ? 'var(--background-secondary)' : theme.previewBg || theme.barColor }}
-                                    />
-                                    <div>
-                                        <div className={`font-bold ${config.theme === key ? currentTheme.text : 'text-slate-300'}`}>{theme.name}</div>
-                                        <div className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">Cliquez pour appliquer</div>
-                                    </div>
-                                </div>
-                                {config.theme === key && (
-                                    <div className="absolute top-2 right-2 w-2 h-2 rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: theme.accent, color: theme.accent }} />
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                 </section>
+              <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                <section>
+                  <h4 className={`text-sm uppercase tracking-wider font-bold mb-4 ${currentTheme.textMuted}`}>Thème & Couleurs</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(THEMES).map(([key, theme]) => (
+                      <button
+                        key={key}
+                        onClick={() => setConfig((prev) => ({ ...prev, theme: key as WebOSConfig['theme'] }))}
+                        className={`group relative overflow-hidden rounded-xl border transition-all text-left p-4 ${config.theme === key ? 'ring-1' : `border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20`
+                          }`}
+                        style={config.theme === key ? { borderColor: theme.accent, backgroundColor: `${theme.accent}10`, ringColor: theme.accent } : {}}
+                      >
+                        <div className="flex items-center gap-4 relative z-10">
+                          <div
+                            className="w-10 h-10 rounded-full shadow-lg border border-white/10"
+                            style={{ backgroundColor: key === 'obsidian' ? 'var(--background-secondary)' : theme.previewBg || theme.barColor }}
+                          />
+                          <div>
+                            <div className={`font-bold ${config.theme === key ? currentTheme.text : 'text-slate-300'}`}>{theme.name}</div>
+                            <div className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">Cliquez pour appliquer</div>
+                          </div>
+                        </div>
+                        {config.theme === key && (
+                          <div className="absolute top-2 right-2 w-2 h-2 rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: theme.accent, color: theme.accent }} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </section>
 
-                 <section>
-                    <h4 className={`text-sm uppercase tracking-wider font-bold mb-4 ${currentTheme.textMuted}`}>Widgets</h4>
-                    <div className="space-y-4">
-                         <div className={`flex items-center justify-between rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                            <div>
-                                <div className={`font-medium ${currentTheme.text}`}>Fond transparent (Obsidget)</div>
-                                <div className={`text-xs ${currentTheme.textMuted}`}>Retire le fond par défaut des widgets Obsidget</div>
-                            </div>
-                            <button
-                                onClick={() => setConfig((prev) => ({...prev, transparentObsidgetWidgets: !prev.transparentObsidgetWidgets}))}
-                                className={`w-12 h-6 rounded-full transition-colors relative`}
-                                style={{ backgroundColor: config.transparentObsidgetWidgets ? currentTheme.accent : 'rgba(255,255,255,0.1)' }}
-                            >
-                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                                    config.transparentObsidgetWidgets ? 'translate-x-6' : 'translate-x-0'
-                                }`} />
-                            </button>
-                        </div>
-                         <div className={`flex items-center justify-between rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                            <div>
-                                <div className={`font-medium ${currentTheme.text}`}>Fond transparent (Plein écran)</div>
-                                <div className={`text-xs ${currentTheme.textMuted}`}>Rend le fond transparent lorsqu'un widget est agrandi</div>
-                            </div>
-                            <button
-                                onClick={() => setConfig((prev) => ({...prev, fullscreenWidgetTransparent: !prev.fullscreenWidgetTransparent}))}
-                                className={`w-12 h-6 rounded-full transition-colors relative`}
-                                style={{ backgroundColor: config.fullscreenWidgetTransparent ? currentTheme.accent : 'rgba(255,255,255,0.1)' }}
-                            >
-                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                                    config.fullscreenWidgetTransparent ? 'translate-x-6' : 'translate-x-0'
-                                }`} />
-                            </button>
-                        </div>
+                <section>
+                  <h4 className={`text-sm uppercase tracking-wider font-bold mb-4 ${currentTheme.textMuted}`}>Widgets</h4>
+                  <div className="space-y-4">
+                    <div className={`flex items-center justify-between rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                      <div>
+                        <div className={`font-medium ${currentTheme.text}`}>Fond transparent (Obsidget)</div>
+                        <div className={`text-xs ${currentTheme.textMuted}`}>Retire le fond par défaut des widgets Obsidget</div>
+                      </div>
+                      <button
+                        onClick={() => setConfig((prev) => ({ ...prev, transparentObsidgetWidgets: !prev.transparentObsidgetWidgets }))}
+                        className={`w-12 h-6 rounded-full transition-colors relative`}
+                        style={{ backgroundColor: config.transparentObsidgetWidgets ? currentTheme.accent : 'rgba(255,255,255,0.1)' }}
+                      >
+                        <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${config.transparentObsidgetWidgets ? 'translate-x-6' : 'translate-x-0'
+                          }`} />
+                      </button>
                     </div>
-                 </section>
-               </div>
+                    <div className={`flex items-center justify-between rounded-xl p-4 border ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                      <div>
+                        <div className={`font-medium ${currentTheme.text}`}>Fond transparent (Plein écran)</div>
+                        <div className={`text-xs ${currentTheme.textMuted}`}>Rend le fond transparent lorsqu'un widget est agrandi</div>
+                      </div>
+                      <button
+                        onClick={() => setConfig((prev) => ({ ...prev, fullscreenWidgetTransparent: !prev.fullscreenWidgetTransparent }))}
+                        className={`w-12 h-6 rounded-full transition-colors relative`}
+                        style={{ backgroundColor: config.fullscreenWidgetTransparent ? currentTheme.accent : 'rgba(255,255,255,0.1)' }}
+                      >
+                        <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${config.fullscreenWidgetTransparent ? 'translate-x-6' : 'translate-x-0'
+                          }`} />
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              </div>
             )}
 
             {/* Fonds d'écran */}
             {settingsTab === 'wallpapers' && (
-                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                    
-                    {/* Input Custom */}
-                    <div className={`p-4 rounded-xl border sticky top-0 z-10 backdrop-blur-md ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
-                        <label className={`text-xs font-bold uppercase mb-2 block ${currentTheme.textMuted}`}>URL personnalisée</label>
-                        <div className="flex gap-2">
-                             <input
-                                value={config.wallpaper}
-                                onChange={(event) => setConfig((prev) => ({ ...prev, wallpaper: event.target.value }))}
-                                className={`flex-1 bg-black/40 p-2.5 rounded-lg border text-sm outline-none transition-colors ${currentTheme.border} ${currentTheme.text}`}
-                                placeholder="https://... ou chemin local"
-                            />
-                        </div>
-                    </div>
+              <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
 
-                    {/* Presets - Accordéon */}
-                    <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
-                        <button 
-                            onClick={() => toggleSection('presets')}
-                            className={`w-full flex items-center justify-between p-4 transition-colors ${currentTheme.hover}`}
-                            style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
-                        >
-                            <h4 className={`flex items-center gap-2 text-sm uppercase tracking-wider font-bold ${currentTheme.textMuted}`}>
-                                <Compass size={16} /> Sélection en ligne
-                            </h4>
-                            {expandedSection === 'presets' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        </button>
-                        
-                        {expandedSection === 'presets' && (
-                            <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`}>
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    {WALLPAPERS.map((url) => (
-                                        <button
-                                        key={url}
-                                        onClick={() => setConfig((prev) => ({ ...prev, wallpaper: url }))}
-                                        className={`group relative aspect-video rounded-xl overflow-hidden border-2 transition-all ${
-                                            config.wallpaper === url ? '' : 'border-transparent hover:border-white/30'
-                                        }`}
-                                        style={config.wallpaper === url ? { borderColor: currentTheme.accent } : {}}
-                                        >
-                                            <div className="absolute inset-0 bg-slate-800 animate-pulse" />
-                                            <img src={url} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
-                                            {config.wallpaper === url && (
-                                                <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: `${currentTheme.accent}30` }}>
-                                                    <div className="rounded-full p-1" style={{ backgroundColor: currentTheme.accent }}><div className="w-2 h-2 bg-white rounded-full" /></div>
-                                                </div>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Local Images - Accordéon */}
-                    <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
-                        <button 
-                            onClick={() => toggleSection('images')}
-                            className={`w-full flex items-center justify-between p-4 transition-colors ${currentTheme.hover}`}
-                            style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
-                        >
-                            <h4 className={`flex items-center gap-2 text-sm uppercase tracking-wider font-bold ${currentTheme.textMuted}`}>
-                                <ImageIcon size={16} /> Images du Vault ({vaultWallpapers.length})
-                            </h4>
-                            {expandedSection === 'images' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        </button>
-
-                        {expandedSection === 'images' && (
-                            <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`}>
-                                {vaultWallpapers.length === 0 ? (
-                                    <div className={`p-4 text-center border border-dashed rounded-xl text-sm ${currentTheme.border} ${currentTheme.textMuted}`}>
-                                        Aucune image trouvée dans votre coffre.
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div 
-                                            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto custom-scrollbar pr-2"
-                                            style={{ maxHeight: '300px' }}
-                                        >
-                                            {vaultWallpapers.slice(0, visibleImageCount).map((path) => (
-                                                <button
-                                                    key={path}
-                                                    onClick={() => setConfig((prev) => ({ ...prev, wallpaper: path }))}
-                                                    className={`group relative aspect-video rounded-lg overflow-hidden border-2 transition-all bg-slate-900 ${
-                                                        config.wallpaper === path ? '' : 'border-white/5 hover:border-white/30'
-                                                    }`}
-                                                    style={config.wallpaper === path ? { borderColor: currentTheme.accent } : {}}
-                                                >
-                                                    <img 
-                                                        src={api.resolveResourcePath(path)} 
-                                                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
-                                                        loading="lazy" 
-                                                    />
-                                                    <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/90 to-transparent">
-                                                        <div className="text-[10px] text-white truncate text-left font-mono">{path.split('/').pop()}</div>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {visibleImageCount < vaultWallpapers.length && (
-                                            <button 
-                                                onClick={() => setVisibleImageCount(prev => prev + 24)}
-                                                className={`w-full mt-2 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition ${currentTheme.textMuted} ${currentTheme.hover}`}
-                                            >
-                                                <ChevronDown size={14} /> Voir plus d'images
-                                            </button>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Local Videos - Accordéon */}
-                    <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
-                        <button 
-                            onClick={() => toggleSection('videos')}
-                            className={`w-full flex items-center justify-between p-4 transition-colors ${currentTheme.hover}`}
-                            style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
-                        >
-                            <h4 className={`flex items-center gap-2 text-sm uppercase tracking-wider font-bold ${currentTheme.textMuted}`}>
-                                <Film size={16} /> Vidéos du Vault ({vaultVideos.length})
-                            </h4>
-                            {expandedSection === 'videos' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        </button>
-
-                        {expandedSection === 'videos' && (
-                             <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`}>
-                                {vaultVideos.length === 0 ? (
-                                    <div className={`p-4 text-center border border-dashed rounded-xl text-sm ${currentTheme.border} ${currentTheme.textMuted}`}>
-                                        Aucune vidéo (mp4, webm) trouvée dans votre coffre.
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div 
-                                            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto custom-scrollbar pr-2"
-                                            style={{ maxHeight: '300px' }}
-                                        >
-                                            {vaultVideos.slice(0, visibleVideoCount).map((path) => (
-                                                <button
-                                                    key={path}
-                                                    onClick={() => setConfig((prev) => ({ ...prev, wallpaper: path }))}
-                                                    className={`group relative aspect-video rounded-lg overflow-hidden border-2 transition-all bg-black ${
-                                                        config.wallpaper === path ? '' : 'border-white/5 hover:border-white/30'
-                                                    }`}
-                                                    style={config.wallpaper === path ? { borderColor: currentTheme.accent } : {}}
-                                                >
-                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-500 group-hover:text-white transition-colors">
-                                                        <Film size={24} className="mb-2 opacity-50" />
-                                                        <div className="text-[10px] font-mono opacity-50">VIDEO</div>
-                                                    </div>
-                                                    
-                                                    <div className="absolute top-2 right-2 bg-black/60 rounded p-1">
-                                                        <Film size={12} className="text-white/70" />
-                                                    </div>
-                                                    <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/90 to-transparent">
-                                                        <div className="text-[10px] text-white truncate text-left font-mono">{path.split('/').pop()}</div>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {visibleVideoCount < vaultVideos.length && (
-                                            <button 
-                                                onClick={() => setVisibleVideoCount(prev => prev + 24)}
-                                                className={`w-full mt-2 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition ${currentTheme.textMuted} ${currentTheme.hover}`}
-                                            >
-                                                <ChevronDown size={14} /> Voir plus de vidéos
-                                            </button>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                {/* Input Custom */}
+                <div className={`p-4 rounded-xl border sticky top-0 z-10 backdrop-blur-md ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                  <label className={`text-xs font-bold uppercase mb-2 block ${currentTheme.textMuted}`}>URL personnalisée</label>
+                  <div className="flex gap-2">
+                    <input
+                      value={config.wallpaper}
+                      onChange={(event) => setConfig((prev) => ({ ...prev, wallpaper: event.target.value }))}
+                      className={`flex-1 bg-black/40 p-2.5 rounded-lg border text-sm outline-none transition-colors ${currentTheme.border} ${currentTheme.text}`}
+                      placeholder="https://... ou chemin local"
+                    />
+                  </div>
                 </div>
+
+                {/* Presets - Accordéon */}
+                <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
+                  <button
+                    onClick={() => toggleSection('presets')}
+                    className={`w-full flex items-center justify-between p-4 transition-colors ${currentTheme.hover}`}
+                    style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
+                  >
+                    <h4 className={`flex items-center gap-2 text-sm uppercase tracking-wider font-bold ${currentTheme.textMuted}`}>
+                      <Compass size={16} /> Sélection en ligne
+                    </h4>
+                    {expandedSection === 'presets' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+
+                  {expandedSection === 'presets' && (
+                    <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`}>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {WALLPAPERS.map((url) => (
+                          <button
+                            key={url}
+                            onClick={() => setConfig((prev) => ({ ...prev, wallpaper: url }))}
+                            className={`group relative aspect-video rounded-xl overflow-hidden border-2 transition-all ${config.wallpaper === url ? '' : 'border-transparent hover:border-white/30'
+                              }`}
+                            style={config.wallpaper === url ? { borderColor: currentTheme.accent } : {}}
+                          >
+                            <div className="absolute inset-0 bg-slate-800 animate-pulse" />
+                            <img src={url} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
+                            {config.wallpaper === url && (
+                              <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: `${currentTheme.accent}30` }}>
+                                <div className="rounded-full p-1" style={{ backgroundColor: currentTheme.accent }}><div className="w-2 h-2 bg-white rounded-full" /></div>
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Local Images - Accordéon */}
+                <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
+                  <button
+                    onClick={() => toggleSection('images')}
+                    className={`w-full flex items-center justify-between p-4 transition-colors ${currentTheme.hover}`}
+                    style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
+                  >
+                    <h4 className={`flex items-center gap-2 text-sm uppercase tracking-wider font-bold ${currentTheme.textMuted}`}>
+                      <ImageIcon size={16} /> Images du Vault ({vaultWallpapers.length})
+                    </h4>
+                    {expandedSection === 'images' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+
+                  {expandedSection === 'images' && (
+                    <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`}>
+                      {vaultWallpapers.length === 0 ? (
+                        <div className={`p-4 text-center border border-dashed rounded-xl text-sm ${currentTheme.border} ${currentTheme.textMuted}`}>
+                          Aucune image trouvée dans votre coffre.
+                        </div>
+                      ) : (
+                        <>
+                          <div
+                            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto custom-scrollbar pr-2"
+                            style={{ maxHeight: '300px' }}
+                          >
+                            {vaultWallpapers.slice(0, visibleImageCount).map((path) => (
+                              <button
+                                key={path}
+                                onClick={() => setConfig((prev) => ({ ...prev, wallpaper: path }))}
+                                className={`group relative aspect-video rounded-lg overflow-hidden border-2 transition-all bg-slate-900 ${config.wallpaper === path ? '' : 'border-white/5 hover:border-white/30'
+                                  }`}
+                                style={config.wallpaper === path ? { borderColor: currentTheme.accent } : {}}
+                              >
+                                <img
+                                  src={api.resolveResourcePath(path)}
+                                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                  loading="lazy"
+                                />
+                                <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/90 to-transparent">
+                                  <div className="text-[10px] text-white truncate text-left font-mono">{path.split('/').pop()}</div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                          {visibleImageCount < vaultWallpapers.length && (
+                            <button
+                              onClick={() => setVisibleImageCount(prev => prev + 24)}
+                              className={`w-full mt-2 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition ${currentTheme.textMuted} ${currentTheme.hover}`}
+                            >
+                              <ChevronDown size={14} /> Voir plus d'images
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Local Videos - Accordéon */}
+                <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
+                  <button
+                    onClick={() => toggleSection('videos')}
+                    className={`w-full flex items-center justify-between p-4 transition-colors ${currentTheme.hover}`}
+                    style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
+                  >
+                    <h4 className={`flex items-center gap-2 text-sm uppercase tracking-wider font-bold ${currentTheme.textMuted}`}>
+                      <Film size={16} /> Vidéos du Vault ({vaultVideos.length})
+                    </h4>
+                    {expandedSection === 'videos' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+
+                  {expandedSection === 'videos' && (
+                    <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`}>
+                      {vaultVideos.length === 0 ? (
+                        <div className={`p-4 text-center border border-dashed rounded-xl text-sm ${currentTheme.border} ${currentTheme.textMuted}`}>
+                          Aucune vidéo (mp4, webm) trouvée dans votre coffre.
+                        </div>
+                      ) : (
+                        <>
+                          <div
+                            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto custom-scrollbar pr-2"
+                            style={{ maxHeight: '300px' }}
+                          >
+                            {vaultVideos.slice(0, visibleVideoCount).map((path) => (
+                              <button
+                                key={path}
+                                onClick={() => setConfig((prev) => ({ ...prev, wallpaper: path }))}
+                                className={`group relative aspect-video rounded-lg overflow-hidden border-2 transition-all bg-black ${config.wallpaper === path ? '' : 'border-white/5 hover:border-white/30'
+                                  }`}
+                                style={config.wallpaper === path ? { borderColor: currentTheme.accent } : {}}
+                              >
+                                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-500 group-hover:text-white transition-colors">
+                                  <Film size={24} className="mb-2 opacity-50" />
+                                  <div className="text-[10px] font-mono opacity-50">VIDEO</div>
+                                </div>
+
+                                <div className="absolute top-2 right-2 bg-black/60 rounded p-1">
+                                  <Film size={12} className="text-white/70" />
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/90 to-transparent">
+                                  <div className="text-[10px] text-white truncate text-left font-mono">{path.split('/').pop()}</div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                          {visibleVideoCount < vaultVideos.length && (
+                            <button
+                              onClick={() => setVisibleVideoCount(prev => prev + 24)}
+                              className={`w-full mt-2 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition ${currentTheme.textMuted} ${currentTheme.hover}`}
+                            >
+                              <ChevronDown size={14} /> Voir plus de vidéos
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
-            
+
           </div>
         </div>
       </div>
@@ -2911,18 +3149,18 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       | { kind: 'template'; template: WebOSWidgetTemplate }
       | { kind: 'item'; item: WebOSWidgetItem }
     > = [
-      ...builtInTemplates.map((template) => ({ kind: 'template' as const, template })),
-      ...osExtraItems.map((item) => ({ kind: 'item' as const, item })),
-      ...obsidgetTemplates.map((template) => ({ kind: 'template' as const, template }))
-    ];
+        ...builtInTemplates.map((template) => ({ kind: 'template' as const, template })),
+        ...osExtraItems.map((item) => ({ kind: 'item' as const, item })),
+        ...obsidgetTemplates.map((template) => ({ kind: 'template' as const, template }))
+      ];
 
     const osEntries: Array<
       | { kind: 'template'; template: WebOSWidgetTemplate }
       | { kind: 'item'; item: WebOSWidgetItem }
     > = [
-      ...builtInTemplates.map((template) => ({ kind: 'template' as const, template })),
-      ...osExtraItems.map((item) => ({ kind: 'item' as const, item }))
-    ];
+        ...builtInTemplates.map((template) => ({ kind: 'template' as const, template })),
+        ...osExtraItems.map((item) => ({ kind: 'item' as const, item }))
+      ];
 
     const galleryEntries =
       widgetGalleryTab === 'os'
@@ -2949,19 +3187,18 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           </div>
           <div className="flex flex-wrap gap-2 mb-6">
             {['all', 'os', 'obsidget'].map(tab => {
-                if (tab === 'obsidget' && obsidgetTemplates.length === 0) return null;
-                return (
-                    <button
-                    key={tab}
-                    onClick={() => setWidgetGalleryTab(tab as any)}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
-                        widgetGalleryTab === tab ? 'text-white' : `${currentTheme.textMuted} bg-white/5 border-white/10 hover:bg-white/10`
+              if (tab === 'obsidget' && obsidgetTemplates.length === 0) return null;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setWidgetGalleryTab(tab as any)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${widgetGalleryTab === tab ? 'text-white' : `${currentTheme.textMuted} bg-white/5 border-white/10 hover:bg-white/10`
                     }`}
-                    style={widgetGalleryTab === tab ? { backgroundColor: currentTheme.accent, borderColor: currentTheme.accent } : {}}
-                    >
-                    {tab === 'all' ? 'Tout' : tab === 'os' ? 'OS' : 'Obsidget'}
-                    </button>
-                )
+                  style={widgetGalleryTab === tab ? { backgroundColor: currentTheme.accent, borderColor: currentTheme.accent } : {}}
+                >
+                  {tab === 'all' ? 'Tout' : tab === 'os' ? 'OS' : 'Obsidget'}
+                </button>
+              )
             })}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -3076,10 +3313,10 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         pageCoords: { ...(prev.pageCoords ?? {}), [pageId]: { x: coord.x, y: coord.y } }
       }));
     };
-    
+
     const canFocusAt = (dx: number, dy: number) => {
       const entry = pageByRel.get(`${dx},${dy}`);
-      
+
       const isHome = entry?.id === 0;
       const itemsInPage = entry ? items.filter((item) => (item.pageIndex ?? 0) === entry.id) : [];
       const hasContent = itemsInPage.length > 0;
@@ -3090,7 +3327,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       const neighbourRelCoords: Array<[number, number]> = [
         [dx + 1, dy], [dx - 1, dy], [dx, dy + 1], [dx, dy - 1]
       ];
-      
+
       const hasNeighbourUseful = neighbourRelCoords.some(([nx, ny]) => {
         const neighbourEntry = pageByRel.get(`${nx},${ny}`);
         if (!neighbourEntry) return false;
@@ -3131,13 +3368,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       const handleKeyDown = (event: KeyboardEvent) => {
         const target = event.target;
         if (target instanceof Element && target.closest('input, textarea, [contenteditable="true"]')) return;
-        
+
         const tryMove = (moveX: number, moveY: number) => {
           const nextDx = atlasFocus.dx + moveX;
           const nextDy = atlasFocus.dy + moveY;
-          if (nextDx >= -extentX && nextDx <= extentX && 
-              nextDy >= -extentY && nextDy <= extentY && 
-              canFocusAt(nextDx, nextDy)) {
+          if (nextDx >= -extentX && nextDx <= extentX &&
+            nextDy >= -extentY && nextDy <= extentY &&
+            canFocusAt(nextDx, nextDy)) {
             setAtlasFocus({ dx: nextDx, dy: nextDy });
           }
         };
@@ -3163,13 +3400,13 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
           }
           return;
         }
-        
-        if (event.key === 'ArrowLeft') { event.preventDefault(); tryMove(-1, 0); } 
-        else if (event.key === 'ArrowRight') { event.preventDefault(); tryMove(1, 0); } 
-        else if (event.key === 'ArrowUp') { event.preventDefault(); tryMove(0, -1); } 
+
+        if (event.key === 'ArrowLeft') { event.preventDefault(); tryMove(-1, 0); }
+        else if (event.key === 'ArrowRight') { event.preventDefault(); tryMove(1, 0); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); tryMove(0, -1); }
         else if (event.key === 'ArrowDown') { event.preventDefault(); tryMove(0, 1); }
       };
-      
+
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }, [showPages, atlasFocus, extentX, extentY, pageByRel, closeModal, goToPage, items]);
@@ -3261,19 +3498,18 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                     goToPage(pageId);
                   }}
                   onPointerEnter={() => {
-                      setAtlasFocus({ dx: cell.dx, dy: cell.dy });
+                    setAtlasFocus({ dx: cell.dx, dy: cell.dy });
                   }}
-                  className={`relative rounded-2xl border transition ${
-                    !hasCard && !isPagesEditMode
-                      ? 'border-transparent bg-transparent cursor-default'
-                      : isEmpty
-                        ? isPagesEditMode
-                          ? 'border-dashed border-white/20 bg-white/5 cursor-pointer'
-                          : 'border-white/5 bg-white/5 cursor-default'
-                        : isActive
-                          ? 'shadow-lg bg-slate-800/80 cursor-pointer'
-                          : 'border-white/10 bg-slate-800/60 hover:border-white/30 cursor-pointer'
-                  } ${isFocused ? 'ring-2 ring-white/60' : ''}`}
+                  className={`relative rounded-2xl border transition ${!hasCard && !isPagesEditMode
+                    ? 'border-transparent bg-transparent cursor-default'
+                    : isEmpty
+                      ? isPagesEditMode
+                        ? 'border-dashed border-white/20 bg-white/5 cursor-pointer'
+                        : 'border-white/5 bg-white/5 cursor-default'
+                      : isActive
+                        ? 'shadow-lg bg-slate-800/80 cursor-pointer'
+                        : 'border-white/10 bg-slate-800/60 hover:border-white/30 cursor-pointer'
+                    } ${isFocused ? 'ring-2 ring-white/60' : ''}`}
                   style={isActive ? { borderColor: currentTheme.accent, shadowColor: `${currentTheme.accent}40` } : {}}
                 >
                   {pageId !== undefined && hasCard ? (
@@ -3310,14 +3546,14 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
                                 }}
                               >
                                 {item.type === 'app' && resolvedIcon ? (
-                                    <img src={resolvedIcon} className="w-4/5 h-4/5 object-contain drop-shadow-sm" />
+                                  <img src={resolvedIcon} className="w-4/5 h-4/5 object-contain drop-shadow-sm" />
                                 ) : item.type === 'widget' && item.html ? (
-                                    <div 
-                                        className="w-[300%] h-[300%] origin-top-left scale-[0.33] pointer-events-none"
-                                        dangerouslySetInnerHTML={{ __html: item.html }} 
-                                    />
+                                  <div
+                                    className="w-[300%] h-[300%] origin-top-left scale-[0.33] pointer-events-none"
+                                    dangerouslySetInnerHTML={{ __html: item.html }}
+                                  />
                                 ) : (
-                                    <div className="text-[6px] text-white/80">{item.icon}</div>
+                                  <div className="text-[6px] text-white/80">{item.icon}</div>
                                 )}
                               </div>
                             );
@@ -3361,9 +3597,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
             event.stopPropagation();
             setIsPagesEditMode((prev) => !prev);
           }}
-          className={`fixed top-4 right-4 px-3 py-1 rounded-full text-[10px] font-semibold border transition backdrop-blur ${
-            isPagesEditMode ? 'text-white' : 'bg-white/10 border-white/10 text-white/80'
-          }`}
+          className={`fixed top-4 right-4 px-3 py-1 rounded-full text-[10px] font-semibold border transition backdrop-blur ${isPagesEditMode ? 'text-white' : 'bg-white/10 border-white/10 text-white/80'
+            }`}
           style={isPagesEditMode ? { backgroundColor: `${currentTheme.accent}AA`, borderColor: currentTheme.accent } : {}}
         >
           {isPagesEditMode ? 'Terminer' : 'Edit'}
@@ -3414,7 +3649,7 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
     <div
       className={`webos-root relative w-full h-full overflow-hidden select-none ${currentTheme.text}`}
       ref={rootRef}
-      style={{ 
+      style={{
         backgroundColor: '#0b0b0b',
         '--theme-bg': currentTheme.modalBg,
         '--theme-text': currentTheme.text === 'text-white' ? '#ffffff' : '#0f172a',
@@ -3424,38 +3659,38 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         if (event.button !== 0) return;
 
         const target = event.target as Element;
-        
-        const isInteractiveElement = 
-          target.closest('[data-widget]') || 
-          target.closest('[data-window]') || 
-          target.closest('.webos-dock') || 
+
+        const isInteractiveElement =
+          target.closest('[data-widget]') ||
+          target.closest('[data-window]') ||
+          target.closest('.webos-dock') ||
           target.closest('.webos-taskbar') ||
-          target.closest('.webos-item-icon') || 
+          target.closest('.webos-item-icon') ||
           target.closest('[data-id]') ||
           target.closest('button') ||
           target.closest('input');
 
         if (isInteractiveElement) return;
-        
+
         if (isWidgetInteractionRef.current) return;
-        
+
         (event.currentTarget as Element).setPointerCapture(event.pointerId);
 
         pointerDownPos.current = { x: event.clientX, y: event.clientY };
         pageCreationBudgetRef.current = 1;
         setPageSnapOffset({ x: 0, y: 0 });
-        
+
         if (pageSnapRafRef.current) {
           window.cancelAnimationFrame(pageSnapRafRef.current);
           pageSnapRafRef.current = null;
         }
-        
+
         pageDragAxisRef.current = null;
         backgroundDragRef.current = { x: event.clientX, y: event.clientY };
         backgroundDragActiveRef.current = true;
         setIsPageDragging(false);
         setPageDragOffsetRaf({ x: 0, y: 0 });
-        
+
         if (backgroundLongPressTimer.current) window.clearTimeout(backgroundLongPressTimer.current);
         if (!isEditing) {
           backgroundLongPressTimer.current = window.setTimeout(() => {
@@ -3467,190 +3702,190 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       }}
       onPointerMove={(event) => {
         if (backgroundLongPressTimer.current && pointerDownPos.current) {
-            const dist = Math.hypot(event.clientX - pointerDownPos.current.x, event.clientY - pointerDownPos.current.y);
-            if (dist > 10) {
-              window.clearTimeout(backgroundLongPressTimer.current);
-              backgroundLongPressTimer.current = null;
-            }
+          const dist = Math.hypot(event.clientX - pointerDownPos.current.x, event.clientY - pointerDownPos.current.y);
+          if (dist > 10) {
+            window.clearTimeout(backgroundLongPressTimer.current);
+            backgroundLongPressTimer.current = null;
           }
-      
-          if (
-            backgroundDragActiveRef.current &&
-            backgroundDragRef.current &&
-            !isEditing &&
-            !draggingId &&
-            !isPageNavBlocked
-          ) {
-            const dx = event.clientX - backgroundDragRef.current.x;
-            const dy = event.clientY - backgroundDragRef.current.y;
-            const absDx = Math.abs(dx);
-            const absDy = Math.abs(dy);
-            if (!pageDragAxisRef.current && (absDx > 6 || absDy > 6)) {
-              pageDragAxisRef.current = absDx >= absDy ? 'x' : 'y';
-            }
-            if (pageDragAxisRef.current === 'x') {
-              const rect = gridRef.current?.getBoundingClientRect();
-              const containerWidth = rect && rect.width > 50 ? rect.width : window.innerWidth;
-              const dragPercent = Math.max(-100, Math.min(100, (dx / containerWidth) * 100));
-              setIsPageDragging(true);
-              setPageDragOffsetRaf({ x: dragPercent, y: 0 });
-            } else if (pageDragAxisRef.current === 'y') {
-              if (config.lockVerticalSwipe) return;
-              const rect = gridRef.current?.getBoundingClientRect();
-              const containerHeight = rect && rect.height > 50 ? rect.height : window.innerHeight;
-              const dragPercent = Math.max(-100, Math.min(100, (dy / containerHeight) * 100));
-              setIsPageDragging(true);
-              setPageDragOffsetRaf({ x: 0, y: dragPercent });
-            } else if (isPageDragging) {
-              setPageDragOffsetRaf({ x: 0, y: 0 });
-            }
+        }
+
+        if (
+          backgroundDragActiveRef.current &&
+          backgroundDragRef.current &&
+          !isEditing &&
+          !draggingId &&
+          !isPageNavBlocked
+        ) {
+          const dx = event.clientX - backgroundDragRef.current.x;
+          const dy = event.clientY - backgroundDragRef.current.y;
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
+          if (!pageDragAxisRef.current && (absDx > 6 || absDy > 6)) {
+            pageDragAxisRef.current = absDx >= absDy ? 'x' : 'y';
           }
-          if (pointerDownPos.current && !draggingId && !resizeHandle) {
-            const dist = Math.hypot(event.clientX - pointerDownPos.current.x, event.clientY - pointerDownPos.current.y);
-            if (dist > 10 && longPressTimer.current) {
-              window.clearTimeout(longPressTimer.current);
-              longPressTimer.current = null;
-            }
+          if (pageDragAxisRef.current === 'x') {
+            const rect = gridRef.current?.getBoundingClientRect();
+            const containerWidth = rect && rect.width > 50 ? rect.width : window.innerWidth;
+            const dragPercent = Math.max(-100, Math.min(100, (dx / containerWidth) * 100));
+            setIsPageDragging(true);
+            setPageDragOffsetRaf({ x: dragPercent, y: 0 });
+          } else if (pageDragAxisRef.current === 'y') {
+            if (config.lockVerticalSwipe) return;
+            const rect = gridRef.current?.getBoundingClientRect();
+            const containerHeight = rect && rect.height > 50 ? rect.height : window.innerHeight;
+            const dragPercent = Math.max(-100, Math.min(100, (dy / containerHeight) * 100));
+            setIsPageDragging(true);
+            setPageDragOffsetRaf({ x: 0, y: dragPercent });
+          } else if (isPageDragging) {
+            setPageDragOffsetRaf({ x: 0, y: 0 });
           }
-      
-          if (resizeHandle) {
-            event.preventDefault();
-            const diffX = event.clientX - resizeHandle.startX;
-            const diffY = event.clientY - resizeHandle.startY;
-            const colDiff = Math.round(diffX / gridRowHeight);
-            const rowDiff = Math.round(diffY / gridRowHeight);
-            const rawCols = Math.max(1, resizeHandle.startCols + colDiff);
-            const rawRows = Math.max(1, resizeHandle.startRows + rowDiff);
-            const resizedItem = items.find((item) => item.id === resizeHandle.id);
-            if (resizedItem?.x && resizedItem?.y) {
-              const maxCols = Math.max(1, gridCols - resizedItem.x + 1);
-              const newCols = Math.min(rawCols, maxCols);
-              const newRows = rawRows;
-              const overlaps = items.some((item) => {
-                if (item.id === resizeHandle.id) return false;
-                if ((item.pageIndex ?? 0) !== (resizedItem.pageIndex ?? 0)) return false;
-                if (!item.x || !item.y) return false;
-                const w = item.cols || 1;
-                const h = item.rows || 1;
-                return !(
-                  item.x + w <= resizedItem.x! ||
-                  resizedItem.x! + newCols <= item.x ||
-                  item.y + h <= resizedItem.y! ||
-                  resizedItem.y! + newRows <= item.y
-                );
-              });
-              if (!overlaps && (newCols !== resizeHandle.currentCols || newRows !== resizeHandle.currentRows)) {
-                updateItem(resizeHandle.id, { cols: newCols, rows: newRows });
-                setResizeHandle({ ...resizeHandle, currentCols: newCols, currentRows: newRows });
-              }
-            }
-            return;
+        }
+        if (pointerDownPos.current && !draggingId && !resizeHandle) {
+          const dist = Math.hypot(event.clientX - pointerDownPos.current.x, event.clientY - pointerDownPos.current.y);
+          if (dist > 10 && longPressTimer.current) {
+            window.clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
           }
-      
-          if (!draggingId || !dragItemRef.current) return;
+        }
+
+        if (resizeHandle) {
           event.preventDefault();
-          setDragPos({ x: event.clientX, y: event.clientY });
-      
-          if (!isPageNavBlocked) {
-            const edgeThreshold = 48;
-            const containerRect = gridRef.current?.getBoundingClientRect();
-            const rightEdge = containerRect ? containerRect.right : window.innerWidth;
-            const leftEdge = containerRect ? containerRect.left : 0;
-            const topEdge = containerRect ? containerRect.top : 0;
-            const bottomEdge = containerRect ? containerRect.bottom : window.innerHeight;
-      
-            const scheduleFlip = (dx: number, dy: number) => {
-              const currentDir = pageFlipDir.current;
-              if (currentDir && currentDir.x === dx && currentDir.y === dy && pageFlipTimer.current) return;
-              if (pageFlipTimer.current) window.clearTimeout(pageFlipTimer.current);
-              pageFlipDir.current = { x: dx, y: dy };
-              pageFlipTimer.current = window.setTimeout(() => {
-                movePageBy(dx, dy);
-              }, 700);
-            };
-      
-            const clearFlip = () => {
-              if (pageFlipTimer.current) window.clearTimeout(pageFlipTimer.current);
-              pageFlipTimer.current = null;
-              pageFlipDir.current = null;
-            };
-      
-            if (event.clientX > rightEdge - edgeThreshold) {
-              scheduleFlip(1, 0);
-            } else if (event.clientX < leftEdge + edgeThreshold) {
-              scheduleFlip(-1, 0);
-            } else if (event.clientY > bottomEdge - edgeThreshold) {
-              scheduleFlip(0, 1);
-            } else if (event.clientY < topEdge + edgeThreshold) {
-              scheduleFlip(0, -1);
-            } else {
-              clearFlip();
-            }
-          }
-      
-          const container = gridRef.current;
-          if (container) {
-            const rect = container.getBoundingClientRect();
-            const itemX = event.clientX - dragOffset.x;
-            const itemY = event.clientY - dragOffset.y;
-            const { x, y } = pixelsToGrid(itemX, itemY, rect);
-            const placeholder = {
-              x,
-              y,
-              w: dragItemRef.current.cols || 1,
-              h: dragItemRef.current.rows || 1
-            };
-            setDragPlaceholder(placeholder);
-      
-            const draggedX = dragItemRef.current.x ?? layoutOverrides.get(dragItemRef.current.id)?.x;
-            const draggedY = dragItemRef.current.y ?? layoutOverrides.get(dragItemRef.current.id)?.y;
-            const overlapTarget = items.find((item) => {
-              if (item.id === draggingId) return false;
-              if ((item.pageIndex ?? 0) !== currentPageId) return false;
-              const ix = item.x ?? layoutOverrides.get(item.id)?.x;
-              const iy = item.y ?? layoutOverrides.get(item.id)?.y;
-              if (!ix || !iy) return false;
-              const iw = item.cols || 1;
-              const ih = item.rows || 1;
+          const diffX = event.clientX - resizeHandle.startX;
+          const diffY = event.clientY - resizeHandle.startY;
+          const colDiff = Math.round(diffX / gridRowHeight);
+          const rowDiff = Math.round(diffY / gridRowHeight);
+          const rawCols = Math.max(1, resizeHandle.startCols + colDiff);
+          const rawRows = Math.max(1, resizeHandle.startRows + rowDiff);
+          const resizedItem = items.find((item) => item.id === resizeHandle.id);
+          if (resizedItem?.x && resizedItem?.y) {
+            const maxCols = Math.max(1, gridCols - resizedItem.x + 1);
+            const newCols = Math.min(rawCols, maxCols);
+            const newRows = rawRows;
+            const overlaps = items.some((item) => {
+              if (item.id === resizeHandle.id) return false;
+              if ((item.pageIndex ?? 0) !== (resizedItem.pageIndex ?? 0)) return false;
+              if (!item.x || !item.y) return false;
+              const w = item.cols || 1;
+              const h = item.rows || 1;
               return !(
-                ix + iw <= placeholder.x ||
-                placeholder.x + placeholder.w <= ix ||
-                iy + ih <= placeholder.y ||
-                placeholder.y + placeholder.h <= iy
+                item.x + w <= resizedItem.x! ||
+                resizedItem.x! + newCols <= item.x ||
+                item.y + h <= resizedItem.y! ||
+                resizedItem.y! + newRows <= item.y
               );
             });
-      
-            const nextPreview =
-              overlapTarget && draggedX && draggedY
-                ? {
-                    targetId: overlapTarget.id,
-                    targetPos: {
-                      x: overlapTarget.x ?? layoutOverrides.get(overlapTarget.id)?.x ?? 0,
-                      y: overlapTarget.y ?? layoutOverrides.get(overlapTarget.id)?.y ?? 0
-                    },
-                    draggedPos: { x: draggedX, y: draggedY }
-                  }
-                : null;
-      
-            setSwapPreview((prev) => {
-              if (!nextPreview && !prev) return prev;
-              if (nextPreview && prev) {
-                if (
-                  prev.targetId === nextPreview.targetId &&
-                  prev.targetPos.x === nextPreview.targetPos.x &&
-                  prev.targetPos.y === nextPreview.targetPos.y &&
-                  prev.draggedPos.x === nextPreview.draggedPos.x &&
-                  prev.draggedPos.y === nextPreview.draggedPos.y
-                ) {
-                  return prev;
-                }
-              }
-              if (nextPreview && (!nextPreview.targetPos.x || !nextPreview.targetPos.y)) {
-                return null;
-              }
-              return nextPreview;
-            });
+            if (!overlaps && (newCols !== resizeHandle.currentCols || newRows !== resizeHandle.currentRows)) {
+              updateItem(resizeHandle.id, { cols: newCols, rows: newRows });
+              setResizeHandle({ ...resizeHandle, currentCols: newCols, currentRows: newRows });
+            }
           }
+          return;
+        }
+
+        if (!draggingId || !dragItemRef.current) return;
+        event.preventDefault();
+        setDragPos({ x: event.clientX, y: event.clientY });
+
+        if (!isPageNavBlocked) {
+          const edgeThreshold = 48;
+          const containerRect = gridRef.current?.getBoundingClientRect();
+          const rightEdge = containerRect ? containerRect.right : window.innerWidth;
+          const leftEdge = containerRect ? containerRect.left : 0;
+          const topEdge = containerRect ? containerRect.top : 0;
+          const bottomEdge = containerRect ? containerRect.bottom : window.innerHeight;
+
+          const scheduleFlip = (dx: number, dy: number) => {
+            const currentDir = pageFlipDir.current;
+            if (currentDir && currentDir.x === dx && currentDir.y === dy && pageFlipTimer.current) return;
+            if (pageFlipTimer.current) window.clearTimeout(pageFlipTimer.current);
+            pageFlipDir.current = { x: dx, y: dy };
+            pageFlipTimer.current = window.setTimeout(() => {
+              movePageBy(dx, dy);
+            }, 700);
+          };
+
+          const clearFlip = () => {
+            if (pageFlipTimer.current) window.clearTimeout(pageFlipTimer.current);
+            pageFlipTimer.current = null;
+            pageFlipDir.current = null;
+          };
+
+          if (event.clientX > rightEdge - edgeThreshold) {
+            scheduleFlip(1, 0);
+          } else if (event.clientX < leftEdge + edgeThreshold) {
+            scheduleFlip(-1, 0);
+          } else if (event.clientY > bottomEdge - edgeThreshold) {
+            scheduleFlip(0, 1);
+          } else if (event.clientY < topEdge + edgeThreshold) {
+            scheduleFlip(0, -1);
+          } else {
+            clearFlip();
+          }
+        }
+
+        const container = gridRef.current;
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          const itemX = event.clientX - dragOffset.x;
+          const itemY = event.clientY - dragOffset.y;
+          const { x, y } = pixelsToGrid(itemX, itemY, rect);
+          const placeholder = {
+            x,
+            y,
+            w: dragItemRef.current.cols || 1,
+            h: dragItemRef.current.rows || 1
+          };
+          setDragPlaceholder(placeholder);
+
+          const draggedX = dragItemRef.current.x ?? layoutOverrides.get(dragItemRef.current.id)?.x;
+          const draggedY = dragItemRef.current.y ?? layoutOverrides.get(dragItemRef.current.id)?.y;
+          const overlapTarget = items.find((item) => {
+            if (item.id === draggingId) return false;
+            if ((item.pageIndex ?? 0) !== currentPageId) return false;
+            const ix = item.x ?? layoutOverrides.get(item.id)?.x;
+            const iy = item.y ?? layoutOverrides.get(item.id)?.y;
+            if (!ix || !iy) return false;
+            const iw = item.cols || 1;
+            const ih = item.rows || 1;
+            return !(
+              ix + iw <= placeholder.x ||
+              placeholder.x + placeholder.w <= ix ||
+              iy + ih <= placeholder.y ||
+              placeholder.y + placeholder.h <= iy
+            );
+          });
+
+          const nextPreview =
+            overlapTarget && draggedX && draggedY
+              ? {
+                targetId: overlapTarget.id,
+                targetPos: {
+                  x: overlapTarget.x ?? layoutOverrides.get(overlapTarget.id)?.x ?? 0,
+                  y: overlapTarget.y ?? layoutOverrides.get(overlapTarget.id)?.y ?? 0
+                },
+                draggedPos: { x: draggedX, y: draggedY }
+              }
+              : null;
+
+          setSwapPreview((prev) => {
+            if (!nextPreview && !prev) return prev;
+            if (nextPreview && prev) {
+              if (
+                prev.targetId === nextPreview.targetId &&
+                prev.targetPos.x === nextPreview.targetPos.x &&
+                prev.targetPos.y === nextPreview.targetPos.y &&
+                prev.draggedPos.x === nextPreview.draggedPos.x &&
+                prev.draggedPos.y === nextPreview.draggedPos.y
+              ) {
+                return prev;
+              }
+            }
+            if (nextPreview && (!nextPreview.targetPos.x || !nextPreview.targetPos.y)) {
+              return null;
+            }
+            return nextPreview;
+          });
+        }
       }}
 
       onPointerUp={(event) => {
@@ -3660,68 +3895,68 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
         }
 
         if (event.target === event.currentTarget && isEditing) {
-            if (ignoreNextClickRef.current) {
-                ignoreNextClickRef.current = false;
-            } else {
-                setIsEditing(false);
-            }
+          if (ignoreNextClickRef.current) {
+            ignoreNextClickRef.current = false;
+          } else {
+            setIsEditing(false);
+          }
         }
 
         if (longPressTimer.current) { window.clearTimeout(longPressTimer.current); longPressTimer.current = null; }
         if (pageFlipTimer.current) { window.clearTimeout(pageFlipTimer.current); pageFlipTimer.current = null; pageFlipDir.current = null; }
-        
+
         if (backgroundDragActiveRef.current && backgroundDragRef.current && !isEditing && !draggingId) {
-              const dragOffset = pageDragOffsetRef.current;
-              if (isPageDragging) {
-                let snapped = false;
-                if (Math.abs(dragOffset.x) >= 30 && Math.abs(dragOffset.x) >= Math.abs(dragOffset.y)) {
-                  const dirX = dragOffset.x < 0 ? 1 : -1;
-                  snapped = movePageBy(dirX, 0);
-                  schedulePageSnap({ x: dragOffset.x + dirX * 100, y: dragOffset.y });
-                } else if (Math.abs(dragOffset.y) >= 30 && Math.abs(dragOffset.y) >= Math.abs(dragOffset.x)) {
-                  if (!config.lockVerticalSwipe) {
-                    const dirY = dragOffset.y < 0 ? 1 : -1;
-                    snapped = movePageBy(0, dirY);
-                    schedulePageSnap({ x: dragOffset.x, y: dragOffset.y + dirY * 100 });
-                  }
-                }
-                if (!snapped) {
-                  schedulePageSnap({ x: dragOffset.x, y: dragOffset.y });
-                }
+          const dragOffset = pageDragOffsetRef.current;
+          if (isPageDragging) {
+            let snapped = false;
+            if (Math.abs(dragOffset.x) >= 30 && Math.abs(dragOffset.x) >= Math.abs(dragOffset.y)) {
+              const dirX = dragOffset.x < 0 ? 1 : -1;
+              snapped = movePageBy(dirX, 0);
+              schedulePageSnap({ x: dragOffset.x + dirX * 100, y: dragOffset.y });
+            } else if (Math.abs(dragOffset.y) >= 30 && Math.abs(dragOffset.y) >= Math.abs(dragOffset.x)) {
+              if (!config.lockVerticalSwipe) {
+                const dirY = dragOffset.y < 0 ? 1 : -1;
+                snapped = movePageBy(0, dirY);
+                schedulePageSnap({ x: dragOffset.x, y: dragOffset.y + dirY * 100 });
               }
+            }
+            if (!snapped) {
+              schedulePageSnap({ x: dragOffset.x, y: dragOffset.y });
+            }
+          }
         }
         if (isPageDragging) setIsPageDragging(false);
         backgroundDragRef.current = null;
         backgroundDragActiveRef.current = false;
-        
+
         if (resizeHandle) { setResizeHandle(null); modifierDragRef.current = false; setSwapPreview(null); return; }
-        
+
         pointerDownPos.current = null;
         modifierDragRef.current = false;
-        
+
         if (draggingId && dragItemRef.current) {
-              const trashRect = trashRef.current?.getBoundingClientRect();
-              const isOverTrash = !!trashRect && event.clientX >= trashRect.left && event.clientX <= trashRect.right && event.clientY >= trashRect.top && event.clientY <= trashRect.bottom;
-              if (isOverTrash) { deleteItem(draggingId); } 
-              else { 
-                  const container = gridRef.current;
-                  if (container) {
-                      const rect = container.getBoundingClientRect();
-                      const itemX = event.clientX - dragOffset.x;
-                      const itemY = event.clientY - dragOffset.y;
-                      const { x, y } = pixelsToGrid(itemX, itemY, rect);
-                      const colliding = items.find((item) => item.id !== draggingId && (item.pageIndex ?? 0) === currentPageId && item.x === x && item.y === y);
-                      if (colliding) {
-                          const draggedItem = items.find((item) => item.id === draggingId);
-                          if (draggedItem) {
-                              updateItem(draggingId, { x, y, pageIndex: currentPageId });
-                              updateItem(colliding.id, { x: draggedItem.x, y: draggedItem.y, pageIndex: currentPageId });
-                          }
-                      } else {
-                          updateItem(draggingId, { x, y, pageIndex: currentPageId });
-                      }
-                  }
+          const trashRect = trashRef.current?.getBoundingClientRect();
+          const isOverTrash = !!trashRect && event.clientX >= trashRect.left && event.clientX <= trashRect.right && event.clientY >= trashRect.top && event.clientY <= trashRect.bottom;
+          if (isOverTrash) { deleteItem(draggingId); }
+          else {
+            const container = gridRef.current;
+            if (container) {
+              const rect = container.getBoundingClientRect();
+              const itemX = event.clientX - dragOffset.x;
+              const itemY = event.clientY - dragOffset.y;
+              const { x, y } = pixelsToGrid(itemX, itemY, rect);
+              const colliding = items.find((item) => item.id !== draggingId && (item.pageIndex ?? 0) === currentPageId && item.x === x && item.y === y);
+              if (colliding) {
+                const draggedItem = items.find((item) => item.id === draggingId);
+                if (draggedItem) {
+                  updateItem(draggingId, { x, y, pageIndex: currentPageId });
+                  updateItem(colliding.id, { x: draggedItem.x, y: draggedItem.y, pageIndex: currentPageId });
+                }
+              } else {
+                updateItem(draggingId, { x, y, pageIndex: currentPageId });
               }
+            }
+          }
         }
         setDraggingId(null);
         setDragPlaceholder(null);
@@ -3756,13 +3991,12 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       <div className="absolute inset-0 bg-black/10" />
 
       <div
-        className={`absolute overflow-hidden ${
-          config.barPosition === 'left'
-            ? 'pl-20 pr-4 py-4'
-            : config.barPosition === 'right'
-              ? 'pr-20 pl-4 py-4'
-              : 'px-4'
-        }`}
+        className={`absolute overflow-hidden ${config.barPosition === 'left'
+          ? 'pl-20 pr-4 py-4'
+          : config.barPosition === 'right'
+            ? 'pr-20 pl-4 py-4'
+            : 'px-4'
+          }`}
         style={{
           top: topInset,
           bottom: bottomInset,
@@ -3843,9 +4077,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
 
       {config.viewMode === 'desktop' && dockItems.length > 0 && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 max-w-[95%] w-auto z-40 ${
-            config.barPosition === 'bottom' ? 'bottom-16' : 'bottom-4'
-          }`}
+          className={`absolute left-1/2 -translate-x-1/2 max-w-[95%] w-auto z-40 ${config.barPosition === 'bottom' ? 'bottom-16' : 'bottom-4'
+            }`}
         >
           <Dock items={dockItems} openItemIds={openDockIds} themeClass={currentTheme.dock} onLaunch={launchItem} resolveIcon={resolveIcon} />
         </div>
@@ -3870,9 +4103,8 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
       ))}
 
       <div
-        className={`absolute left-0 right-0 flex justify-center pointer-events-none z-30 transition-opacity duration-300 ${
-          showPageDots ? 'opacity-100' : 'opacity-0'
-        }`}
+        className={`absolute left-0 right-0 flex justify-center pointer-events-none z-30 transition-opacity duration-300 ${showPageDots ? 'opacity-100' : 'opacity-0'
+          }`}
         style={config.barPosition === 'bottom' ? { top: topInset } : { bottom: bottomInset }}
       >
         <div
@@ -3917,17 +4149,16 @@ export const Desktop: React.FC<DesktopProps> = ({ api }) => {
               return (
                 <div
                   key={`${rowIndex}-${colIndex}`}
-                  className={`rounded-full transition-all ${
-                    !hasDot
-                      ? 'bg-transparent'
-                      : isCurrent
-                        ? 'bg-white scale-125'
-                        : isMain
-                          ? 'bg-sky-300'
-                          : pageId !== undefined && hasContent
-                            ? 'bg-white/60'
-                            : 'bg-white/10'
-                  }`}
+                  className={`rounded-full transition-all ${!hasDot
+                    ? 'bg-transparent'
+                    : isCurrent
+                      ? 'bg-white scale-125'
+                      : isMain
+                        ? 'bg-sky-300'
+                        : pageId !== undefined && hasContent
+                          ? 'bg-white/60'
+                          : 'bg-white/10'
+                    }`}
                   style={{
                     width: `${dotSize}px`,
                     height: `${dotSize}px`
