@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Minus, Square, X } from 'lucide-react';
+import { Minus, Plus, Square, X } from 'lucide-react';
 import type { WebOSConfig, WebOSWindow } from '../types';
 
 interface WindowFrameProps {
@@ -13,6 +13,8 @@ interface WindowFrameProps {
   onUpdate: (id: string, updates: Partial<WebOSWindow>) => void;
   barColor?: string;
   widgetTransparent?: boolean;
+  /** Appelé quand l’utilisateur clique sur « Ajouter au dock » (fenêtre widget uniquement) */
+  onPinToDock?: (window: WebOSWindow) => void;
   children: React.ReactNode;
 }
 
@@ -27,6 +29,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
   onUpdate,
   barColor,
   widgetTransparent,
+  onPinToDock,
   children
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -82,12 +85,14 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
       }
     : null;
 
+  const isFullscreenWidget = win.isMaximized && win.kind === 'widget';
+
   return (
     <div
       data-window="true"
       className={`absolute flex flex-col overflow-hidden rounded-lg shadow-2xl border border-white/20 backdrop-blur-xl transition-all duration-200 gpu-layer ${
         win.isMaximized ? 'rounded-none' : ''
-      }`}
+      } ${isFullscreenWidget ? 'widget-fullscreen-gpu' : ''}`}
       style={{
         left: win.isMaximized ? maxInsets?.left : win.x,
         top: win.isMaximized ? maxInsets?.top : win.y,
@@ -143,13 +148,26 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
           >
             <Square size={9} className="text-white" />
           </button>
+          {win.kind === 'widget' && onPinToDock && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPinToDock(win);
+              }}
+              className="w-4 h-4 rounded-full bg-blue-500 hover:bg-blue-600 border border-white/30 shadow flex items-center justify-center"
+              aria-label="Ajouter au dock"
+              title="Ajouter au dock"
+            >
+              <Plus size={10} className="text-white" />
+            </button>
+          )}
         </div>
         <div className="text-xs font-bold text-white/80 truncate">{win.title}</div>
         <div className="w-10" />
       </div>
 
       <div
-        className={`flex-1 relative ${win.kind === 'widget' ? '' : 'bg-white text-slate-900'}`}
+        className={`flex-1 relative min-h-0 ${win.kind === 'widget' ? '' : 'bg-white text-slate-900'}`}
         style={
           win.kind === 'widget'
             ? {
@@ -159,7 +177,13 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
             : undefined
         }
       >
-        {children}
+        {isFullscreenWidget ? (
+          <div className="widget-fullscreen-gpu-content w-full h-full">
+            {children}
+          </div>
+        ) : (
+          children
+        )}
         {(isDragging || isResizing) && <div className="absolute inset-0 z-50 bg-transparent" />}
       </div>
 

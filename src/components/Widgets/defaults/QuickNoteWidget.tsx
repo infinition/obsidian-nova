@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { WebOSAPI } from '../../types';
+import type { WebOSAPI } from '../../../types';
 
 const NOTE_PATH = 'WebOS-Note.md';
 
 interface QuickNoteWidgetProps {
   api: WebOSAPI;
+  instanceId?: string;
 }
 
-export const QuickNoteWidget: React.FC<QuickNoteWidgetProps> = ({ api }) => {
+export const QuickNoteWidget: React.FC<QuickNoteWidgetProps> = ({ api, instanceId: _instanceId }) => {
   const [value, setValue] = useState('');
   const [loaded, setLoaded] = useState(false);
   const saveTimer = useRef<number | null>(null);
@@ -37,11 +38,10 @@ export const QuickNoteWidget: React.FC<QuickNoteWidgetProps> = ({ api }) => {
 
   return (
     <textarea
-      className="w-full h-full bg-transparent resize-none p-2 outline-none text-slate-800"
-      placeholder="Ecrire une note..."
+      className="w-full h-full min-h-0 min-w-0 bg-transparent resize-none p-2 outline-none text-slate-800 box-border"
+      placeholder="Write a note..."
       value={value}
       onChange={(e) => setValue(e.target.value)}
     />
   );
 };
-
