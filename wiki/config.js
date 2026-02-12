@@ -13,7 +13,7 @@ const CONFIG = {
     versioning: {
         type: "local",
         manualVersion: "v3.0.1",
-        manualDate: "2026-02-11"
+        manualDate: "2026-02-12"
     },
 
     // GitHub Repository
