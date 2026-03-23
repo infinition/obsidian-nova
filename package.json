@@ -1,6 +1,6 @@
 {
   "name": "obsidian-nova",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "Obsidian Nova plugin with a desktop-like interface.",
   "main": "main.js",
   "scripts": {
