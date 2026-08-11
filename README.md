@@ -1,4 +1,4 @@
-<img width="138" height="134" alt="Obsidian Nova" src="https://github.com/user-attachments/assets/12a49e1a-47d8-47a6-b40e-784c6d2e56e4" />
+<img width="271" height="275" alt="image-removebg-preview (16)" src="https://github.com/user-attachments/assets/a4c34928-779a-4e81-ba9d-7f80006224eb" />
 
 # Obsidian Nova
 
