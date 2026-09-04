@@ -1869,15 +1869,15 @@ if (event.key === 'ArrowRight') {
           return;
         }
       }
-        
+
       // Vérifier que le focus est dans notre plugin (ou que le body est actif et notre plugin visible)
-      const isInInput = document.activeElement instanceof HTMLElement && 
+      const isInInput = document.activeElement instanceof HTMLElement &&
         document.activeElement.closest('input, textarea, select, [contenteditable="true"]');
       const isPluginVisible = rootRef.current && rootRef.current.offsetParent !== null;
-      const focusInPlugin = rootRef.current?.contains(document.activeElement) || 
+      const focusInPlugin = rootRef.current?.contains(document.activeElement) ||
         document.activeElement?.closest('.webos-root');
       const isPluginActive = isPluginVisible && (focusInPlugin || document.activeElement === document.body);
-      
+
       // PageUp/PageDown : densité grille (si option activée) ou scale widgets/icônes
       if (event.key === 'PageUp' || event.key === 'PageDown') {
         if (!isPluginActive && !showSettings && !showWidgetGallery && !showPages) return;
@@ -1952,14 +1952,14 @@ if (event.key === 'ArrowRight') {
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    
+
     const handleWheel = (event: WheelEvent) => {
       if (showSettings || showWidgetGallery || showPages) return;
       const rect = el.getBoundingClientRect();
       const edgeThreshold = 100;
       const isLeftEdge = event.clientX - rect.left < edgeThreshold;
       const isRightEdge = rect.right - event.clientX < edgeThreshold;
-      
+
       if ((isLeftEdge || isRightEdge) && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
         event.preventDefault();
         const direction = event.deltaY > 0 ? (isRightEdge ? 1 : -1) : (isRightEdge ? -1 : 1);
@@ -1967,7 +1967,7 @@ if (event.key === 'ArrowRight') {
         animatePageChange(direction, 0);
       }
     };
-    
+
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
   }, [showSettings, showWidgetGallery, showPages, animatePageChange]);
@@ -2083,7 +2083,20 @@ if (event.key === 'ArrowRight') {
 
   const deleteItem = (id: string) => {
     if (PROTECTED_ITEM_IDS.has(id)) return;
-    setItems((prev) => prev.filter((item) => item.id !== id));
+
+    setItems((prev) => {
+      const nextItems = prev.filter((item) => item.id !== id);
+
+      api.saveState({
+        items: nextItems,
+        config,
+        windows,
+        widgetTemplates,
+        dataVersion: 3
+      });
+
+      return nextItems;
+    });
   };
 
   const findFreeSlot = (cols: number, rows: number): { x: number; y: number; pageIndex: number } => {
@@ -2756,7 +2769,7 @@ if (event.key === 'ArrowRight') {
       const pendingTarget = pendingSwapPreviewRef.current?.targetId;
       const nextTarget = nextPreview?.targetId;
       const isSameTarget = pendingTarget != null && nextTarget != null && pendingTarget === nextTarget;
-      
+
       if (!nextPreview) {
         // Plus de cible : annuler immédiatement
         if (swapPreviewTimerRef.current) {
@@ -2890,7 +2903,7 @@ if (event.key === 'ArrowRight') {
           const dragCols = draggedItem?.cols || 1;
           const dragRows = draggedItem?.rows || 1;
           const { x, y } = pixelsToGrid(itemX, itemY, rect, dragCols, dragRows);
-          
+
           // Utiliser swapPreview si actif (le délai a été respecté), sinon pas d'échange
           if (swapPreview && swapPreview.targetId) {
             // Échange confirmé par le délai
@@ -2900,22 +2913,22 @@ if (event.key === 'ArrowRight') {
             }
           } else {
             // Pas d'échange, vérifier collision avec tous les widgets (multi-cellules inclus)
-            
+
             const colliding = items.find((item) => {
               if (item.id === draggingId) return false;
               if ((item.pageIndex ?? 0) !== currentPageId) return false;
               if (config.viewMode === 'desktop' && item.type === 'app') return false;
               if (!item.x || !item.y) return false;
-              
+
               const itemCols = item.cols || 1;
               const itemRows = item.rows || 1;
-              
+
               // Vérifier si les rectangles se chevauchent
               const overlapX = x < (item.x + itemCols) && (x + dragCols) > item.x;
               const overlapY = y < (item.y + itemRows) && (y + dragRows) > item.y;
               return overlapX && overlapY;
             });
-            
+
             if (!colliding) {
               updateItem(draggingId, { x, y, pageIndex: currentPageId });
             }
@@ -3744,11 +3757,11 @@ if (event.key === 'ArrowRight') {
             </nav>
 
             <div className={`p-4 border-t ${currentTheme.border}`}>
-                <button 
+                <button
                     onClick={() => {
                       api.saveState({ items, config, windows, widgetTemplates, dataVersion: 3 });
                       setShowSettings(false);
-                    }} 
+                    }}
                     className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-semibold transition ${currentTheme.textMuted}`}
                 >
                     Fermer
@@ -3761,7 +3774,7 @@ if (event.key === 'ArrowRight') {
             className="flex-1 overflow-y-scroll custom-scrollbar p-8"
             style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
           >
-            
+
             {/* Général */}
             {settingsTab === 'general' && (
               <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
@@ -3957,7 +3970,7 @@ if (event.key === 'ArrowRight') {
                             style={config.theme === key ? { borderColor: theme.accent, backgroundColor: `${theme.accent}10`, ringColor: theme.accent } : {}}
                             >
                                 <div className="flex items-center gap-4 relative z-10">
-                                    <div 
+                                    <div
                                         className="w-10 h-10 rounded-full shadow-lg border border-white/10"
                                         style={{ backgroundColor: key === 'obsidian' ? 'var(--background-secondary)' : theme.previewBg || theme.barColor }}
                                     />
@@ -4081,7 +4094,7 @@ if (event.key === 'ArrowRight') {
             {/* Fonds d'écran */}
             {settingsTab === 'wallpapers' && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                    
+
                     {/* Input Custom */}
                     <div className={`p-4 rounded-xl border sticky top-0 z-10 backdrop-blur-md ${currentTheme.border}`} style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
                         <label className={`text-xs font-bold uppercase mb-2 block ${currentTheme.textMuted}`}>URL personnalisée</label>
@@ -4112,7 +4125,7 @@ if (event.key === 'ArrowRight') {
 
                     {/* Presets - Accordéon */}
                     <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
-                        <button 
+                        <button
                             onClick={() => toggleSection('presets')}
                             className={`w-full flex items-center justify-between p-4 transition-colors ${currentTheme.hover}`}
                             style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
@@ -4122,7 +4135,7 @@ if (event.key === 'ArrowRight') {
                             </h4>
                             {expandedSection === 'presets' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                         </button>
-                        
+
                         {expandedSection === 'presets' && (
                             <div className={`p-4 bg-black/20 border-t ${currentTheme.border}`} onClick={(e) => e.stopPropagation()}>
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -4152,7 +4165,7 @@ if (event.key === 'ArrowRight') {
 
                     {/* Local Images - Galerie pellicule */}
                     <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
-                        <button 
+                        <button
                             onClick={() => toggleSection('images')}
                             className={`w-full flex items-center justify-between p-4 transition-colors ${currentTheme.hover}`}
                             style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
@@ -4227,7 +4240,7 @@ if (event.key === 'ArrowRight') {
 
                     {/* Local Videos - Liste / Pellicule */}
                     <div className={`border rounded-xl overflow-hidden ${currentTheme.border}`}>
-                        <button 
+                        <button
                             onClick={() => toggleSection('videos')}
                             className={`w-full flex items-center justify-between p-4 transition-colors ${currentTheme.hover}`}
                             style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
@@ -4258,7 +4271,7 @@ if (event.key === 'ArrowRight') {
                                             </button>
                                         </div>
                                         {videoViewMode === 'list' ? (
-                                            <div 
+                                            <div
                                                 className="flex flex-col gap-1 overflow-y-auto custom-scrollbar pr-2"
                                                 style={{ maxHeight: '280px' }}
                                             >
@@ -4282,7 +4295,7 @@ if (event.key === 'ArrowRight') {
                                                 })}
                                             </div>
                                         ) : (
-                                            <div 
+                                            <div
                                                 className="flex gap-3 overflow-x-auto overflow-y-hidden pb-2 custom-scrollbar"
                                                 style={{ maxHeight: '140px', scrollSnapType: 'x mandatory' }}
                                             >
@@ -4334,7 +4347,7 @@ if (event.key === 'ArrowRight') {
                     </div>
                 </div>
             )}
-            
+
           </div>
         </div>
       </div>
@@ -4783,7 +4796,7 @@ if (event.key === 'ArrowRight') {
           setShowPages(true);
           return;
         }
-        
+
         if (event.button !== 0) return;
 
         const target = event.target as Element;
@@ -4836,7 +4849,7 @@ if (event.key === 'ArrowRight') {
               backgroundLongPressTimer.current = null;
             }
           }
-      
+
           if (
             backgroundDragActiveRef.current &&
             backgroundDragRef.current &&
@@ -4875,7 +4888,7 @@ if (event.key === 'ArrowRight') {
               longPressTimer.current = null;
             }
           }
-      
+
           if (resizeHandle) {
             event.preventDefault();
             const diffX = event.clientX - resizeHandle.startX;
@@ -4929,7 +4942,7 @@ if (event.key === 'ArrowRight') {
             const leftEdge = containerRect ? containerRect.left : 0;
             const topEdge = containerRect ? containerRect.top : 0;
             const bottomEdge = containerRect ? containerRect.bottom : window.innerHeight;
-      
+
             const scheduleFlip = (dx: number, dy: number) => {
               const currentDir = pageFlipDir.current;
               if (currentDir && currentDir.x === dx && currentDir.y === dy && pageFlipTimer.current) return;
@@ -4939,7 +4952,7 @@ if (event.key === 'ArrowRight') {
                 movePageBy(dx, dy);
               }, flipDelayMs);
             };
-      
+
             const clearFlip = () => {
               if (pageFlipStableTimer.current) window.clearTimeout(pageFlipStableTimer.current);
               pageFlipStableTimer.current = null;
@@ -4948,14 +4961,14 @@ if (event.key === 'ArrowRight') {
               pageFlipTimer.current = null;
               pageFlipDir.current = null;
             };
-      
+
             const px = event.clientX;
             const py = event.clientY;
             const inRight = px > rightEdge - edgeThreshold;
             const inLeft = px < leftEdge + edgeThreshold;
             const inBottom = py > bottomEdge - edgeThreshold;
             const inTop = py < topEdge + edgeThreshold;
-      
+
             if (inRight) {
               setEdgeDragDirection('right');
               const last = pageFlipStablePos.current;
@@ -5020,7 +5033,7 @@ if (event.key === 'ArrowRight') {
             const { x, y } = pixelsToGrid(itemX, itemY, rect, w, h);
             const placeholder = { x, y, w, h };
             setDragPlaceholder(placeholder);
-      
+
             const draggedX = dragItemRef.current.x ?? layoutOverrides.get(dragItemRef.current.id)?.x;
             const draggedY = dragItemRef.current.y ?? layoutOverrides.get(dragItemRef.current.id)?.y;
             const overlapTarget = items.find((item) => {
@@ -5039,7 +5052,7 @@ if (event.key === 'ArrowRight') {
                 placeholder.y + placeholder.h <= iy
               );
             });
-      
+
             const nextPreview =
               overlapTarget && draggedX && draggedY
                 ? {
@@ -5121,7 +5134,7 @@ if (event.key === 'ArrowRight') {
         if (isPageDragging) setIsPageDragging(false);
         backgroundDragRef.current = null;
         backgroundDragActiveRef.current = false;
-        
+
         if (resizeHandle) {
           if (config.debugWidgetDimensions) {
             const item = items.find((i) => i.id === resizeHandle.id);
@@ -5145,7 +5158,7 @@ if (event.key === 'ArrowRight') {
           setSwapPreview(null);
           return;
         }
-        
+
         pointerDownPos.current = null;
         modifierDragRef.current = false;
 
@@ -5165,7 +5178,7 @@ if (event.key === 'ArrowRight') {
                       const dragColsTouch = draggedItemTouch?.cols || 1;
                       const dragRowsTouch = draggedItemTouch?.rows || 1;
                       const { x, y } = pixelsToGrid(itemX, itemY, rect, dragColsTouch, dragRowsTouch);
-                      
+
                       // Utiliser swapPreview si actif (le délai a été respecté)
                       if (swapPreview && swapPreview.targetId) {
                           if (draggedItemTouch) {
@@ -5174,21 +5187,21 @@ if (event.key === 'ArrowRight') {
                           }
                       } else {
                           // Vérifier collision avec tous les widgets (multi-cellules inclus)
-                          
+
                           const colliding = items.find((item) => {
                             if (item.id === draggingId) return false;
                             if ((item.pageIndex ?? 0) !== currentPageId) return false;
                             if (config.viewMode === 'desktop' && item.type === 'app') return false;
                             if (!item.x || !item.y) return false;
-                            
+
                             const itemCols = item.cols || 1;
                             const itemRows = item.rows || 1;
-                            
+
                             const overlapX = x < (item.x + itemCols) && (x + dragColsTouch) > item.x;
                             const overlapY = y < (item.y + itemRows) && (y + dragRowsTouch) > item.y;
                             return overlapX && overlapY;
                           });
-                          
+
                           if (!colliding) {
                               updateItem(draggingId, { x, y, pageIndex: currentPageId });
                           }
@@ -5588,7 +5601,7 @@ if (event.key === 'ArrowRight') {
           addWidgetFromItem={addWidgetFromItem}
         />
       )}
-      
+
       {/* Modal d'édition des apps/icons */}
       {editingItem && (
         <ItemEditModal
@@ -5599,7 +5612,7 @@ if (event.key === 'ArrowRight') {
           uiScale={config.uiScale}
         />
       )}
-      
+
       {showPages && (
         <PagesModalStable
           config={config}
